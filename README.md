@@ -1,4 +1,4 @@
-### GitLock
+# GitLock
 
 *Verifiable, Trustless Code Escrow & Deployment Binding Platform.*
 
