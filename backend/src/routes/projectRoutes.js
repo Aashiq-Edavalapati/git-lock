@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { initProject, uploadCode } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -12,8 +12,13 @@ const upload = multer({ storage: storage });
 // Client creates project
 router.post('/create', authenticateToken, requireRole('CLIENT'), initProject);
 
+// Client invites developer later
+router.post('/invite', authenticateToken, requireRole('CLIENT'), inviteDeveloper);
+
+// Developer accepts invite
+router.post('/accept', authenticateToken, requireRole('DEVELOPER'), acceptProject);
+
 // Developer uploads code
-// Note: 'sourceCode' matches the key name in the form-data
 router.post('/upload', authenticateToken, requireRole('DEVELOPER'), upload.single('sourceCode'), uploadCode);
 
 export default router;

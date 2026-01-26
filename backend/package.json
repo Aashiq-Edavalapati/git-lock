@@ -22,7 +22,8 @@
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
     "otplib": "^13.2.1",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "razorpay": "^2.9.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

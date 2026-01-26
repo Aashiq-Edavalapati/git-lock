@@ -27,3 +27,19 @@ export const sendMFAEmail = async (email, code) => {
     throw new Error('Email service failed');
   }
 };
+
+export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: devEmail,
+    subject: `New Project Invite: ${projectTitle}`,
+    text: `Hello,\n\n${clientName} has invited you to work on "${projectTitle}" with a budget of $${budget}.\n\nPlease log in to GitLock to accept or reject this project.\n\n- The GitLock Team`
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Invite sent to ${devEmail}`);
+  } catch (error) {
+    console.error('❌ Invite Email failed:', error);
+  }
+};
