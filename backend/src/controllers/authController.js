@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { createUser, findUserByEmail, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
+import { createUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { sendMFAEmail } from '../utils/emailService.js';
 import { generateToken } from '../utils/jwtService.js';
 
@@ -100,7 +100,8 @@ export const verifyMFA = async (req, res) => {
     // 5. Issue JWT Token (HttpOnly Cookie)
     // We also fetch user details again to ensure role is correct
     // (In a full app, you might want to fetch the user object here)
-    const token = generateToken({ id: userId }); // Simplified for now
+    const user = await findUserById(userId);
+    const token = generateToken(user); // Passed full user object
 
     res.cookie('token', token, {
       httpOnly: true,

@@ -20,6 +20,13 @@ export const findUserByEmail = async (email) => {
   return result.rows[0]; // Returns undefined if not found
 };
 
+// Find user by ID (for MFA verification/Token generation)
+export const findUserById = async (id) => {
+  const query = `SELECT * FROM users WHERE id = $1`;
+  const result = await pool.query(query, [id]);
+  return result.rows[0];
+};
+
 // Save the Hashed OTP and Expiry to the user record
 export const saveMFASecret = async (userId, secret, expiry) => {
   // We store it as "SECRET|EXPIRY" string for simplicity in this lab
