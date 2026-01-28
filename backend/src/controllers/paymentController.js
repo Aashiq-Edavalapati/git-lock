@@ -8,19 +8,30 @@ export const createOrder = async (req, res) => {
   try {
     const { amount, currency = 'INR' } = req.body;
     
+    // Ensure amount is handled as integer (paise)
+    const amountInPaise = Math.round(parseFloat(amount) * 100);
+    console.log(`Making Razorpay Order: ₹${amount} -> ${amountInPaise} paise`);
+
     const options = {
-      amount: amount * 100, 
+      amount: amountInPaise, 
       currency,
       receipt: `receipt_${Date.now()}`,
     };
 
     const order = await razorpay.orders.create(options);
+    console.log(`✅ Order Created: ${order.id} | Amount: ${order.amount}`);
     res.json(order);
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Payment Order Failed' });
   }
+};
+
+// 1.5 Get Razorpay Key (Public)
+export const getRazorpayKey = (req, res) => {
+    console.log("🔑 Sending Razorpay Key to Frontend:", process.env.RAZORPAY_KEY_ID);
+    res.json({ key: process.env.RAZORPAY_KEY_ID });
 };
 
 // 2. Verify Payment & Unlock Code

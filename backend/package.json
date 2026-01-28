@@ -13,6 +13,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.4",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

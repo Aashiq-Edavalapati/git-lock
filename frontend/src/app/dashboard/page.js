@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import ClientView from "@/components/dashboard/ClientView";
 import DeveloperView from "@/components/dashboard/DeveloperView";
-import { getSession } from "@/lib/auth";
+import api from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -12,15 +12,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Check who is logged in
-    const user = getSession();
-    if (user) {
-        setRole(user.role);
-    } else {
-        // Fallback for demo if user goes directly to /dashboard without login
-        // In real app: window.location.href = '/login';
-        setRole("client"); // Default fallback
-    }
-    setLoading(false);
+    api.get('/auth/me')
+      .then(res => {
+          setRole(res.data.role);
+          setLoading(false);
+      })
+      .catch(() => {
+          // Redirect to login if failed
+          window.location.href = '/login';
+      });
   }, []);
 
   if (loading) {
@@ -34,7 +34,7 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-in fade-in duration-500">
-       {role === "developer" ? <DeveloperView /> : <ClientView />}
+       {role === "DEVELOPER" ? <DeveloperView /> : <ClientView />}
     </div>
   );
 }

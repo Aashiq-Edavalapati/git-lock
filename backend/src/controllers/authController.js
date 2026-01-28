@@ -117,3 +117,13 @@ export const verifyMFA = async (req, res) => {
     res.status(500).json({ error: 'MFA Verification Error' });
   }
 };
+
+export const getMe = async (req, res) => {
+  try {
+     const user = await findUserById(req.user.id);
+     if (!user) return res.status(404).json({ error: 'User not found' });
+     res.json({ id: user.id, name: user.full_name, email: user.email, role: user.role });
+  } catch (error) {
+    res.status(500).json({ error: 'Server Error' });
+  }
+};

@@ -1,59 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Github, Mail, Lock, Code2, UserCircle2, 
-  ShieldCheck, AlertCircle, CheckCircle2 
-} from "lucide-react";
+import { Github, Mail, Lock, Code2, UserCircle2, ShieldCheck, AlertCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { login } from "@/lib/auth"; // Import the helper
+import api from "@/lib/api"; // Real API
 
 export default function LoginPage() {
-  const [mode, setMode] = useState("signin");
-  const [role, setRole] = useState("developer");
-  const [formData, setFormData] = useState({ email: "", password: "", name: "" });
-  const [errors, setErrors] = useState({});
+  const [formData, setFormData] = useState({ email: "", password: "", otp: "" });
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Login, 2: MFA
+  const [userId, setUserId] = useState(null);
 
-  const validate = () => {
-    let newErrors = {};
-    // Email Regex
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address.";
-    }
-    // Password Strength
-    if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters.";
-    }
-    // Name (Signup only)
-    if (mode === 'signup' && formData.name.length < 2) {
-      newErrors.name = "Please enter your full name.";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
-
     setIsLoading(true);
-    
-    // Simulate Network Request
-    setTimeout(() => {
-        // Save session using our helper
-        login(formData.email, role, formData.name || "User");
+    setError("");
+
+    try {
+        const res = await api.post('/auth/login', { email: formData.email, password: formData.password });
+        if (res.data.mfaRequired) {
+            setUserId(res.data.userId);
+            setStep(2); // Move to MFA
+        }
+    } catch (err) {
+        setError(err.response?.data?.error || "Login Failed");
+    } finally {
         setIsLoading(false);
-        // Force redirect to dashboard
-        window.location.href = "/dashboard";
-    }, 1500);
+    }
   };
+
+  const handleVerifyMfa = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    
+    try {
+        const res = await api.post('/auth/verify-mfa', { userId, otp: formData.otp });
+        console.log("Logged in:", res.data);
+        window.location.href = "/dashboard";
+    } catch (err) {
+         setError(err.response?.data?.error || "Invalid OTP");
+    } finally {
+        setIsLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
-      
-      {/* LEFT: Branding (Unchanged Visuals) */}
+      {/* Left Panel (Visuals) */}
       <div className="relative hidden lg:flex flex-col justify-between p-12 bg-[#050505] overflow-hidden border-r border-white/5">
          <div className="absolute inset-0">
             <div className="absolute top-[-20%] left-[-20%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]" />
@@ -79,93 +74,55 @@ export default function LoginPage() {
          <div className="relative z-10 text-xs text-gray-600">© 2026 GitLock Inc.</div>
       </div>
 
-      {/* RIGHT: Auth Form */}
-      <div className="flex items-center justify-center p-6 bg-black relative">
+      {/* Right Panel (Login) */}
+      <div className="flex items-center justify-center p-6 bg-black">
          <div className="w-full max-w-md space-y-8">
             <div className="text-center">
-               <h2 className="text-3xl font-bold text-white mb-2">
-                  {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-               </h2>
-               <p className="text-gray-400 text-sm">
-                  {mode === 'signin' ? 'Access your secure vault.' : 'Secure your code transactions.'}
-               </p>
+               <h2 className="text-3xl font-bold text-white">Welcome Back</h2>
+               <p className="text-gray-400 text-sm">Sign in to your vault.</p>
             </div>
 
             <div className="glass-card p-8 rounded-2xl border-white/5 bg-white/[0.02]">
                
-               {/* Role Toggle */}
-               <AnimatePresence>
-                  {mode === 'signup' && (
-                     <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="mb-6 overflow-hidden"
-                     >
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 block">I am a...</label>
-                        <div className="grid grid-cols-2 gap-3">
-                           <button type="button" onClick={() => setRole('developer')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${role === 'developer' ? 'bg-primary/10 border-primary text-primary' : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}>
-                              <Code2 size={20} /><span className="text-sm font-bold">Developer</span>
-                           </button>
-                           <button type="button" onClick={() => setRole('client')} className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${role === 'client' ? 'bg-primary/10 border-primary text-primary' : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/5'}`}>
-                              <UserCircle2 size={20} /><span className="text-sm font-bold">Client</span>
-                           </button>
+               {step === 1 ? (
+                   <form onSubmit={handleLogin} className="space-y-4">
+                      <div>
+                         <input 
+                            type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
+                         />
+                      </div>
+                      <div>
+                         <input 
+                            type="password" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
+                         />
+                      </div>
+                      {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
+                      <Button className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying...' : 'Secure Login'}</Button>
+                   </form>
+               ) : (
+                   <form onSubmit={handleVerifyMfa} className="space-y-4">
+                        <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center">
+                            <p className="text-sm text-primary mb-2">Check the Backend Console for OTP</p>
+                            <div className="text-xs text-gray-500">(Real email sending is simulated in this lab)</div>
                         </div>
-                     </motion.div>
-                  )}
-               </AnimatePresence>
-
-               <form onSubmit={handleSubmit} className="space-y-4">
-                  {mode === 'signup' && (
-                     <div>
-                        <input 
-                            type="text" 
-                            placeholder="Full Name" 
-                            className={`w-full bg-black/40 border rounded-lg p-3 text-white outline-none transition-colors ${errors.name ? 'border-red-500' : 'border-white/10 focus:border-primary/50'}`}
-                            value={formData.name}
-                            onChange={(e) => {setFormData({...formData, name: e.target.value}); setErrors({...errors, name: ''})}}
-                        />
-                        {errors.name && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={10}/> {errors.name}</p>}
-                     </div>
-                  )}
-                  
-                  <div>
-                     <input 
-                        type="email" 
-                        placeholder="Email Address" 
-                        className={`w-full bg-black/40 border rounded-lg p-3 text-white outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-white/10 focus:border-primary/50'}`}
-                        value={formData.email}
-                        onChange={(e) => {setFormData({...formData, email: e.target.value}); setErrors({...errors, email: ''})}}
-                     />
-                     {errors.email && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={10}/> {errors.email}</p>}
-                  </div>
-
-                  <div>
-                     <input 
-                        type="password" 
-                        placeholder="Password" 
-                        className={`w-full bg-black/40 border rounded-lg p-3 text-white outline-none transition-colors ${errors.password ? 'border-red-500' : 'border-white/10 focus:border-primary/50'}`}
-                        value={formData.password}
-                        onChange={(e) => {setFormData({...formData, password: e.target.value}); setErrors({...errors, password: ''})}}
-                     />
-                     {errors.password && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={10}/> {errors.password}</p>}
-                  </div>
-
-                  <Button className="w-full h-12 text-base" disabled={isLoading}>
-                     {isLoading ? (
-                        <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> Processing...</span>
-                     ) : (
-                        mode === 'signin' ? 'Sign In' : 'Create Account'
-                     )}
-                  </Button>
-               </form>
-               
-               <div className="text-center mt-6">
-                  <button onClick={() => {setMode(mode === 'signin' ? 'signup' : 'signin'); setErrors({})}} className="text-sm text-gray-400 hover:text-white transition-colors">
-                     {mode === 'signin' ? "New to GitLock? " : "Already have an account? "}
-                     <span className="text-primary font-bold hover:underline">{mode === 'signin' ? 'Sign Up' : 'Log In'}</span>
-                  </button>
-               </div>
+                        <div>
+                         <label className="text-gray-400 text-sm mb-1 block">Enter 6-Digit OTP</label>
+                         <input 
+                            type="text" placeholder="000000" value={formData.otp} onChange={e => setFormData({...formData, otp: e.target.value})}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-center text-2xl tracking-[0.5em] text-white focus:border-primary/50 outline-none font-mono"
+                            maxLength={6}
+                         />
+                      </div>
+                      {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
+                      <Button className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying OTP...' : 'Verify Identity'}</Button>
+                   </form>
+               )}
+            </div>
+            
+            <div className="mt-6 text-center text-sm text-gray-500">
+               Don't have an account? <a href="/register" className="text-white hover:underline font-medium">Create one</a>
             </div>
          </div>
       </div>
