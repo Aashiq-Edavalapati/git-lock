@@ -11,10 +11,17 @@ export const listProjects = async (req, res) => {
   try {
     const userId = req.user.id;
     // Show projects where user is client OR developer
+    // Join with users table to get names
     const query = `
-      SELECT * FROM projects 
-      WHERE client_id = $1 OR developer_id = $1 OR (developer_email = $2)
-      ORDER BY created_at DESC
+      SELECT 
+        p.*, 
+        c.full_name as client_name, 
+        d.full_name as developer_name
+      FROM projects p
+      LEFT JOIN users c ON p.client_id = c.id
+      LEFT JOIN users d ON p.developer_id = d.id
+      WHERE p.client_id = $1 OR p.developer_id = $1 OR (p.developer_email = $2)
+      ORDER BY p.created_at DESC
     `;
     const userEmail = (await findUserById(userId)).email;
     const result = await pool.query(query, [userId, userEmail]);

@@ -1,55 +1,54 @@
--- Enable crypto extension for UUIDs
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
--- 1. USERS (Identity & Auth)
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    full_name VARCHAR(255),
-    password_hash VARCHAR(255), -- Nullable for OAuth users
-    auth_provider VARCHAR(50) DEFAULT 'email', -- 'email', 'google', 'github'
-    role VARCHAR(50) CHECK (role IN ('DEVELOPER', 'CLIENT', 'ADMIN')),
-    mfa_secret VARCHAR(255), -- For TOTP/MFA logic
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.audit_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  action character varying,
+  details jsonb,
+  timestamp timestamp with time zone DEFAULT now(),
+  CONSTRAINT audit_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
-
--- 2. PROJECTS (The Contract)
-CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    budget DECIMAL(10, 2),
-    client_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    developer_email VARCHAR(255) NOT NULL, -- To send invite
-    developer_id UUID REFERENCES users(id), -- Null until Dev accepts
-    status VARCHAR(50) CHECK (status IN ('INVITE_SENT', 'IN_PROGRESS', 'LOCKED_REVIEW', 'COMPLETED', 'CANCELLED', 'REJECTED')) DEFAULT 'INVITE_SENT',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.project_versions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id uuid,
+  encrypted_blob bytea NOT NULL,
+  zip_hash character varying NOT NULL,
+  commit_sha character varying,
+  github_repo_url character varying,
+  staging_url character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  readme_preview text,
+  repo_url text,
+  CONSTRAINT project_versions_pkey PRIMARY KEY (id),
+  CONSTRAINT project_versions_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
 );
-
--- 3. PROJECT_VERSIONS (The Immutable Ledger)
-CREATE TABLE project_versions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    
-    -- Source Data
-    encrypted_blob BYTEA NOT NULL, -- The AES-256 Encrypted ZIP
-    zip_hash VARCHAR(64) NOT NULL, -- SHA-256 of upload
-    
-    -- GitHub Binding
-    commit_sha VARCHAR(40),
-    github_repo_url VARCHAR(255),
-    
-    -- Verification
-    staging_url VARCHAR(255),
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.projects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title character varying NOT NULL,
+  description text,
+  budget numeric,
+  client_id uuid,
+  developer_email character varying,
+  developer_id uuid,
+  status character varying DEFAULT 'INVITE_SENT'::character varying CHECK (status::text = ANY (ARRAY['INVITE_SENT'::character varying, 'IN_PROGRESS'::character varying, 'LOCKED_REVIEW'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying, 'REJECTED'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT projects_pkey PRIMARY KEY (id),
+  CONSTRAINT projects_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.users(id),
+  CONSTRAINT projects_developer_id_fkey FOREIGN KEY (developer_id) REFERENCES public.users(id)
 );
-
--- 4. AUDIT_LOGS (Security Requirement)
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id),
-    action VARCHAR(100), -- 'LOGIN', 'UPLOAD_ATTEMPT', 'PAYMENT_VERIFIED'
-    details JSONB,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email character varying NOT NULL UNIQUE,
+  full_name character varying,
+  password_hash character varying,
+  auth_provider character varying DEFAULT 'email'::character varying,
+  role character varying CHECK (role::text = ANY (ARRAY['DEVELOPER'::character varying, 'CLIENT'::character varying, 'ADMIN'::character varying]::text[])),
+  mfa_secret character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  github_access_token text,
+  google_id character varying,
+  github_id character varying,
+  avatar_url text,
+  google_access_token text,
+  bio text,
+  CONSTRAINT users_pkey PRIMARY KEY (id)
 );

@@ -24,7 +24,7 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     // 3. Create User
-    const newUser = await createUser(email, fullName, passwordHash, role);
+    const newUser = await createUser(email, fullName, passwordHash, role, null);
 
     res.status(201).json({ 
       message: 'User registered successfully', 
@@ -124,7 +124,19 @@ export const getMe = async (req, res) => {
   try {
      const user = await findUserById(req.user.id);
      if (!user) return res.status(404).json({ error: 'User not found' });
-     res.json({ id: user.id, name: user.full_name, email: user.email, role: user.role });
+     
+     // Check for connected apps
+     const isGithubConnected = !!user.github_access_token;
+     
+     res.json({ 
+        id: user.id, 
+        name: user.full_name, 
+        email: user.email, 
+        role: user.role,
+        bio: user.bio || '',
+        avatarUrl: user.avatar_url || null,
+        isGithubConnected
+     });
   } catch (error) {
     res.status(500).json({ error: 'Server Error' });
   }
@@ -154,12 +166,14 @@ export const githubLogin = async (req, res) => {
        // Create new user (Generate a random password hash since they won't use it)
        // Use provided role or default to DEVELOPER if invalid
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
-       user = await createUser(githubProfile.email, githubProfile.name, 'oauth_placeholder', userRole);
+       // Extract avatar (GitHub uses 'avatar_url')
+       const avatarUrl = githubProfile.avatar_url;
+       user = await createUser(githubProfile.email, githubProfile.name, 'oauth_placeholder', userRole, avatarUrl);
     }
 
     // Update their Github Token in DB (We need this for the GitLock Verification step!)
-    await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
-      [accessToken, githubProfile.id, user.id]);
+    await pool.query('UPDATE users SET github_access_token = $1, github_id = $2, avatar_url=$3 WHERE id = $4', 
+      [accessToken, githubProfile.id, githubProfile.avatar_url, user.id]);
 
     // 4. Issue JWT
     const token = generateToken(user);
@@ -192,12 +206,14 @@ export const googleLogin = async (req, res) => {
     if (!user) {
        // Create new user (Generate a random password hash since they won't use it)
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
-       user = await createUser(googleProfile.email, googleProfile.name, 'oauth_placeholder', userRole);
+       // Extract avatar (Google uses 'picture')
+       const avatarUrl = googleProfile.picture;
+       user = await createUser(googleProfile.email, googleProfile.name, 'oauth_placeholder', userRole, avatarUrl);
     }
 
     // Update their Google Token in DB
-    await pool.query('UPDATE users SET google_access_token = $1, google_id = $2 WHERE id = $3', 
-      [accessToken, googleProfile.id, user.id]);
+    await pool.query('UPDATE users SET google_access_token = $1, google_id = $2, avatar_url=$3 WHERE id = $4', 
+      [accessToken, googleProfile.id, googleProfile.picture, user.id]);
 
     // 4. Issue JWT
     const token = generateToken(user);
@@ -212,6 +228,19 @@ export const googleLogin = async (req, res) => {
 export const logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { fullName, bio } = req.body;
+    const { updateUserProfile } = await import('../models/userModel.js'); // Lazy import to avoid circular dependency issues if any
+    
+    const updatedUser = await updateUserProfile(req.user.id, fullName, bio);
+    res.json({ message: 'Profile updated', user: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
 };
 
 export const connectGithubAccount = async (req, res) => {

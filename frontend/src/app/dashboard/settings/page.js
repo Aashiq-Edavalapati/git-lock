@@ -1,21 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   User, Github, CreditCard, Shield, 
   LogOut, Save, CheckCircle2, AlertCircle 
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import api from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("profile"); // profile, billing, security
-  const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState({
+    name: "",
+    email: "",
+    bio: "",
+    avatarUrl: "",
+    isGithubConnected: false
+  });
 
-  const handleSave = () => {
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      setUserData({
+        name: data.name,
+        email: data.email,
+        bio: data.bio,
+        avatarUrl: data.avatarUrl,
+        isGithubConnected: data.isGithubConnected
+      });
+    } catch (error) {
+       console.error("Failed to load profile");
+    }
+  };
+
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => setLoading(false), 1000);
+    try {
+      await api.put('/auth/profile', {
+        fullName: userData.name,
+        bio: userData.bio
+      });
+      // Optionally show toast success
+    } catch (error) {
+      console.error("Failed to save");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const connectGithub = () => {
+    const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+    const REDIRECT_URI = `${window.location.origin}/auth/github`; 
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=repo,user:email`;
   };
 
   return (
@@ -50,8 +94,12 @@ export default function SettingsPage() {
         {activeTab === 'profile' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
             <div className="flex items-center gap-6">
-               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-gray-700 to-gray-600 border-2 border-white/10 flex items-center justify-center">
-                  <User size={32} className="text-gray-400" />
+               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-gray-700 to-gray-600 border-2 border-white/10 flex items-center justify-center overflow-hidden">
+                  {userData.avatarUrl ? (
+                      <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                      <User size={32} className="text-gray-400" />
+                  )}
                </div>
                <div>
                   <Button variant="outline" className="text-xs h-8">Change Avatar</Button>
@@ -62,15 +110,31 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Display Name</label>
-                  <input type="text" defaultValue="Aashiq Edavalapati" className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none" />
+                  <input 
+                    type="text" 
+                    value={userData.name} 
+                    onChange={(e) => setUserData({...userData, name: e.target.value})}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none" 
+                  />
                </div>
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Email</label>
-                  <input type="email" defaultValue="aashiq@example.com" disabled className="w-full bg-white/5 border border-white/5 rounded-lg p-3 text-gray-400 cursor-not-allowed" />
+                  <input 
+                    type="email" 
+                    value={userData.email} 
+                    disabled 
+                    className="w-full bg-white/5 border border-white/5 rounded-lg p-3 text-gray-400 cursor-not-allowed" 
+                   />
                </div>
                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Bio / Headline</label>
-                  <textarea rows="3" defaultValue="Full Stack Developer specialized in React & Node." className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none resize-none" />
+                  <textarea 
+                    rows="3" 
+                    value={userData.bio} 
+                    onChange={(e) => setUserData({...userData, bio: e.target.value})}
+                    placeholder="Full Stack Developer specialized in React & Node." 
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none resize-none" 
+                  />
                </div>
             </div>
           </motion.div>
@@ -90,12 +154,12 @@ export default function SettingsPage() {
                        <p className="font-bold text-white">GitHub Account</p>
                        <p className="text-xs text-gray-400">Required to verify commit hashes.</p>
                     </div>
-                    {isGithubConnected ? (
+                    {userData.isGithubConnected ? (
                        <div className="flex items-center gap-2 text-green-400 text-sm font-bold bg-green-500/10 px-3 py-1 rounded-full">
                           <CheckCircle2 size={16} /> Connected
                        </div>
                     ) : (
-                       <Button onClick={() => setIsGithubConnected(true)} variant="outline" className="h-9">Connect GitHub</Button>
+                       <Button onClick={connectGithub} variant="outline" className="h-9">Connect GitHub</Button>
                     )}
                  </div>
               </section>
@@ -143,12 +207,14 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* Footer Actions */}
+      {/* Footer Actions for Profile */}
+      {activeTab === 'profile' && (
       <div className="flex justify-end pt-4">
          <Button onClick={handleSave} className="w-32" disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
          </Button>
       </div>
+      )}
 
     </div>
   );
