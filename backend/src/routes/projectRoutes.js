@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -27,5 +27,6 @@ router.post('/upload', authenticateToken, requireRole('DEVELOPER'), upload.singl
 
 // Verification Endpoint
 router.post('/verify-details', authenticateToken, requireRole('DEVELOPER'), verifyProjectDetails);
+router.get('/:id/download', authenticateToken, downloadCode); // New Endpoint
 
 export default router;

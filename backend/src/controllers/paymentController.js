@@ -86,18 +86,12 @@ export const verifyAndUnlock = async (req, res) => {
 
     await client.query('COMMIT');
 
-    // C. Decryption
-    const encryptedString = encrypted_blob.toString('utf-8'); 
-    const decryptedBuffer = decryptBuffer(encryptedString);
+    // C. Decryption (Moved to separate download endpoint)
+    // const encryptedString = encrypted_blob.toString('utf-8'); 
+    // const decryptedBuffer = decryptBuffer(encryptedString);
 
-    // D. Send File to Client
-    res.set({
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="project_${projectId}_unlocked.zip"`,
-      'Content-Length': decryptedBuffer.length
-    });
-
-    res.send(decryptedBuffer);
+    // D. Send JSON Success
+    res.status(200).json({ success: true, message: "Payment Verified & Project Unlocked" });
 
   } catch (error) {
     await client.query('ROLLBACK');

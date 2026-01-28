@@ -131,23 +131,21 @@ export default function EscrowPage({ params }) {
                 // 3. Verify & Unlock
                 try {
                     console.log("🔐 Requesting Unlock from Backend...");
-                    const unlockRes = await api.post('/payments/unlock', {
+                    // 1. Verify Payment & Unlock
+                    await api.post('/payments/unlock', {
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
                         razorpay_signature: response.razorpay_signature,
                         projectId: project.id
-                    }, { responseType: 'blob' });
+                    });
 
-                    // Trigger Download
-                    const url = window.URL.createObjectURL(new Blob([unlockRes.data]));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', `project_${project.id}_source.zip`);
-                    document.body.appendChild(link);
-                    link.click();
-                    
-                    fetchProject();
                     alert("Payment Successful! Code Unlocked.");
+                    fetchProject(); // Refresh UI to show UNLOCKED state
+
+                    // 2. Trigger Download (Optional auto-download)
+                    // We can redirect/open new tab for download or fetch blob
+                    window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank');
+
                 } catch (verifyErr) {
                      console.error("Unlock Error:", verifyErr);
                     const errMsg = verifyErr.response?.data?.error || verifyErr.message || "Unknown Error";
@@ -208,6 +206,16 @@ export default function EscrowPage({ params }) {
              {canViewFiles ? (
                 <div className="space-y-4">
                     <h3 className="text-xl font-bold text-white text-center">Files Accessible</h3>
+                    
+                    <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-center">
+                         <Button 
+                            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                        >
+                            <FileCode className="mr-2" size={20}/> Download Source Code
+                        </Button>
+                    </div>
+
                     <div className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-2">
                         {/* Rubric #5: Encoding/Decoding Visual Proof */}
                         {project.version?.readme_preview ? (
@@ -235,8 +243,17 @@ export default function EscrowPage({ params }) {
                         </div>
                     )}
                     
-                    <div className="blur-sm select-none opacity-50 bg-black/40 p-4 rounded-xl space-y-2">
-                        <div className="flex items-center gap-3 text-gray-500"><FileCode size={16}/> source_code.zip (AES-256)</div>
+                    <div className="bg-black/40 p-4 rounded-xl space-y-2 border border-green-500/20">
+                        <div className="flex items-center justify-between text-green-400">
+                            <div className="flex items-center gap-3"><FileCode size={16}/> source_code.zip (Decrypted)</div>
+                            <Button 
+                                onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank')}
+                                size="sm" 
+                                className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                Download
+                            </Button>
+                        </div>
                     </div>
                     {/* Only Client sees Pay Button */}
                     {!isDev && <Button onClick={handlePayment} className="w-full h-12">Pay ₹{project.budget} to Unlock</Button>}

@@ -32,7 +32,7 @@ function CreateLockForm() {
   // Github Details
   const [repoOwner, setRepoOwner] = useState("");
   const [repoName, setRepoName] = useState("");
-  const [commitHash, setCommitHash] = useState("");
+  const [commitSha, setcommitSha] = useState("");
   const [stagingUrl, setStagingUrl] = useState("");
   const [repoStatus, setRepoStatus] = useState("idle"); // idle, loading, success, error
   
@@ -74,11 +74,11 @@ function CreateLockForm() {
   };
 
   const handleVerifyGit = async () => {
-    if(repoOwner && repoName && commitHash && stagingUrl) {
+    if(repoOwner && repoName && commitSha && stagingUrl) {
         setRepoStatus("loading");
         try {
             await api.post('/projects/verify-details', {
-                projectId, repoOwner, repoName, commitSha: commitHash, stagingUrl
+                projectId, repoOwner, repoName, commitSha: commitSha, stagingUrl
             });
             setRepoStatus("success");
             // alert("Verification Successful!");
@@ -100,7 +100,7 @@ function CreateLockForm() {
         formData.append("stagingUrl", stagingUrl); 
         formData.append("repoOwner", repoOwner);
         formData.append("repoName", repoName);
-        formData.append("commitHash", commitHash);
+        formData.append("commitSha", commitSha);
         formData.append("sourceCode", file);
 
         await api.post('/projects/upload', formData, {
@@ -190,7 +190,7 @@ function CreateLockForm() {
                         <div className="col-span-2">
                              <label className="text-sm text-gray-400 block mb-2">Commit SHA (Full Hash)</label>
                              <input type="text" placeholder="e.g. 5237b7..." className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary/50" 
-                                value={commitHash} onChange={e => setCommitHash(e.target.value)} />
+                                value={commitSha} onChange={e => setcommitSha(e.target.value)} />
                         </div>
                         <div className="col-span-2">
                              <label className="text-sm text-gray-400 block mb-2">Staging URL</label>
@@ -274,7 +274,7 @@ function CreateLockForm() {
                      </div>
                      <div className="flex justify-between border-b border-white/5 pb-2">
                          <span className="text-gray-400">Commit</span>
-                         <span className="text-primary font-mono">{commitHash.substring(0,8)}...</span>
+                         <span className="text-primary font-mono">{commitSha.substring(0,8)}...</span>
                      </div>
                      <div className="flex justify-between">
                          <span className="text-gray-400">Source File</span>

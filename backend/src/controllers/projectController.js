@@ -158,7 +158,7 @@ const fetchGithubZip = async (repoOwner, repoName, commitSha, token) => {
   const response = await axios({
     url,
     method: 'GET',
-    responseType: 'arraybuffer', // Important! We need raw bytes
+    responseType: 'arraybuffer', 
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data; // This is a Buffer
@@ -166,10 +166,10 @@ const fetchGithubZip = async (repoOwner, repoName, commitSha, token) => {
 
 export const uploadCode = async (req, res) => {
   try {
-    let { projectId, stagingUrl, commitSha, commitHash, repoUrl, repoOwner, repoName } = req.body;
+    let { projectId, stagingUrl, commitSha, repoUrl, repoOwner, repoName } = req.body;
 
     // Use commitHash if commitSha is missing
-    commitSha = commitSha || commitHash;
+    commitSha = commitSha;
     
     // If repoOwner/Name provided directly, construct repoUrl
     if (repoOwner && repoName) {
@@ -264,7 +264,10 @@ export const uploadCode = async (req, res) => {
     // For now, keep using the uploaded file's simple hash as the identifier.
     const finalHash = generateFileHash(req.file.buffer);
 
-    await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl);
+    const readmeEntry = githubZip.getEntries().find(e => e.entryName.toLowerCase().endsWith('readme.md'));
+    const readmeBase64 = readmeEntry ? readmeEntry.getData().toString('base64') : null;
+
+    await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl, readmeBase64);
     await updateProjectStatus(projectId, 'LOCKED_REVIEW');
 
     res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
@@ -286,7 +289,9 @@ const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl
   if (!successState) {
     throw new Error('No successful deployment found for this commit SHA.');
   }
-
+  console.log("[DEBUG]: success state", successState);
+  console.log("[DEBUG]: provided url", providedUrl);
+  console.log("[DEBUG]: target url", successState.target_url);
   // 3. Optional: Verify URL match
   // Some CI providers put the URL in `target_url`.
   if (successState.target_url && !successState.target_url.includes(providedUrl)) {
@@ -331,3 +336,42 @@ export const verifyProjectDetails = async (req, res) => {
         res.status(500).json({ error: 'Server Verification Error' });
     }
 }
+
+export const downloadCode = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const project = await findProjectById(id);
+        
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        
+        // Access Control: Only Client or Developer or if Unlocked
+        if (project.status !== 'COMPLETED' && req.user.id !== project.client_id && req.user.id !== project.developer_id) {
+             return res.status(403).json({ error: 'Access Denied: Project is locked.' });
+        }
+
+        // Get Version
+        const versionQuery = `SELECT encrypted_blob FROM project_versions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1`;
+        const versionResult = await pool.query(versionQuery, [id]);
+        
+        if (versionResult.rows.length === 0) return res.status(404).json({ error: 'No code found' });
+
+        const { encrypted_blob } = versionResult.rows[0];
+        
+        // Decrypt dynamically
+        const { decryptBuffer } = await import('../utils/cryptoService.js');
+
+        const encryptedString = encrypted_blob.toString('utf-8');
+        const decryptedBuffer = decryptBuffer(encryptedString);
+
+        res.set({
+            'Content-Type': 'application/zip',
+            'Content-Disposition': `attachment; filename="project_${id}_source.zip"`,
+            'Content-Length': decryptedBuffer.length
+        });
+        res.send(decryptedBuffer);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Download Failed' });
+    }
+};

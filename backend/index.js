@@ -16,6 +16,11 @@ const runMigration = async () => {
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id TEXT;`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token TEXT;`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT;`);
+        
+        // Ensure project_versions has the new columns
+        await pool.query(`ALTER TABLE project_versions ADD COLUMN IF NOT EXISTS repo_url TEXT;`);
+        await pool.query(`ALTER TABLE project_versions ADD COLUMN IF NOT EXISTS commit_sha TEXT;`);
+        
         console.log("✅ Database Migration Checked: OAuth columns exist.");
     } catch (err) {
         console.error("Migration Failed:", err.message);
