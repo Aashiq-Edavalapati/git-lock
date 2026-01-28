@@ -17,6 +17,7 @@ export default function EscrowPage({ params }) {
     return new Promise((resolve) => {
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      // script.async = true; // Try async loading
       script.onload = () => resolve(true);
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
@@ -116,14 +117,20 @@ export default function EscrowPage({ params }) {
 
         const options = {
             key: key, 
-            // amount: order.amount, // Omit to avoid mismatch with order_id
-            // currency: order.currency, // Omit to avoid mismatch with order_id
+            // amount: order.amount, // Rely on order_id
+            // currency: order.currency, // Rely on order_id
             name: "GitLock Escrow",
             description: `Unlock Code for ${project.title}`,
             order_id: order.id,
+            notes: {
+                projectId: project.id, // Metadata
+            },
             handler: async function (response) {
+                console.log("💳 Razorpay Payment Success!", response); 
+                
                 // 3. Verify & Unlock
                 try {
+                    console.log("🔐 Requesting Unlock from Backend...");
                     const unlockRes = await api.post('/payments/unlock', {
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
@@ -142,25 +149,33 @@ export default function EscrowPage({ params }) {
                     fetchProject();
                     alert("Payment Successful! Code Unlocked.");
                 } catch (verifyErr) {
-                    console.error(verifyErr);
-                    alert("Verification Failed: " + (verifyErr.response?.data?.error || "Signature Mismatch"));
+                     console.error("Unlock Error:", verifyErr);
+                    const errMsg = verifyErr.response?.data?.error || verifyErr.message || "Unknown Error";
+                    const status = verifyErr.response?.status || "No Status";
+                    alert(`Verification Failed! \nStatus: ${status} \nError: ${errMsg}`);
                 }
             },
             prefill: {
                 name: currentUser.name,
                 email: currentUser.email,
-                contact: "9999999999", // Required by Razorpay to avoid 400 Bad Request
+                contact: "9999999999", // Default to prevent region lock
             },
             theme: { color: "#3399cc" },
-            retry: { enabled: false }, // Prevent auto-retry on 500 to debug
+            // retry: { enabled: false }, // Re-enabled default retry
             modal: {
                 ondismiss: function() {
                     console.log('Checkout form closed');
                 }
             }
         };
+
+        console.log("🚀 Initializing Razorpay with Options:", options); // DEBUG LOG
         
         const rzp1 = new window.Razorpay(options);
+        rzp1.on('payment.failed', function (response){
+                console.error("❌ Payment Failed Event:", response.error);
+                alert(`Payment Failed: ${response.error.description} \nReason: ${response.error.reason} \nSource: ${response.error.source}`);
+        });
         rzp1.open();
 
     } catch (err) {

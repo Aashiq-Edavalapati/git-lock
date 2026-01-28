@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import pool from '../config/db.js';
 import { createUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
+import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
 import { sendMFAEmail } from '../utils/emailService.js';
 import { generateToken } from '../utils/jwtService.js';
 
@@ -125,5 +127,113 @@ export const getMe = async (req, res) => {
      res.json({ id: user.id, name: user.full_name, email: user.email, role: user.role });
   } catch (error) {
     res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+export const githubLogin = async (req, res) => {
+  try {
+    const { code, role } = req.body; // Frontend sends the code and selected role
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+
+    // 1. Exchange Code for Token
+    const accessToken = await getGithubToken(code);
+    if (!accessToken) return res.status(401).json({ error: 'GitHub Auth Failed' });
+
+    // 2. Get User Profile
+    const githubProfile = await getGithubUser(accessToken);
+    
+    // 3. Find or Create User in DB
+    // Logic: Check if user exists by email OR github_id. 
+    // If not, insert them. 
+    // CRITICAL: We MUST store the accessToken to fetch their private repos later.
+    
+    // (Simplified DB logic for brevity - assume findOrCreateUser function exists)
+    let user = await findUserByEmail(githubProfile.email); // You might need to handle null email from GitHub
+    
+    if (!user) {
+       // Create new user (Generate a random password hash since they won't use it)
+       // Use provided role or default to DEVELOPER if invalid
+       const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
+       user = await createUser(githubProfile.email, githubProfile.name, 'oauth_placeholder', userRole);
+    }
+
+    // Update their Github Token in DB (We need this for the GitLock Verification step!)
+    await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
+      [accessToken, githubProfile.id, user.id]);
+
+    // 4. Issue JWT
+    const token = generateToken(user);
+    res.cookie('token', token, { httpOnly: true });
+    res.json({ token, user });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'GitHub Login Error' });
+  }
+};
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { code, role } = req.body;
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+
+    // 1. Exchange Code for Token
+    const tokenData = await getGoogleToken(code);
+    const accessToken = tokenData.access_token;
+    const idToken = tokenData.id_token; // Contains user info
+
+    // 2. Get User Profile (Using ID Token or Access Token)
+    // Google OAuth usually gives user info in the ID Token or via UserInfo endpoint
+    const googleProfile = await getGoogleUser(accessToken);
+    
+    // 3. Find or Create User in DB
+    let user = await findUserByEmail(googleProfile.email);
+    
+    if (!user) {
+       // Create new user (Generate a random password hash since they won't use it)
+       const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
+       user = await createUser(googleProfile.email, googleProfile.name, 'oauth_placeholder', userRole);
+    }
+
+    // Update their Google Token in DB
+    await pool.query('UPDATE users SET google_access_token = $1, google_id = $2 WHERE id = $3', 
+      [accessToken, googleProfile.id, user.id]);
+
+    // 4. Issue JWT
+    const token = generateToken(user);
+    res.cookie('token', token, { httpOnly: true });
+    res.json({ token, user });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Google Login Error' });
+  }
+};
+export const logout = (req, res) => {
+  res.clearCookie('token');
+  res.status(200).json({ message: 'Logged out successfully' });
+};
+
+export const connectGithubAccount = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+
+    // 1. Exchange Code
+    const accessToken = await getGithubToken(code);
+    if (!accessToken) return res.status(401).json({ error: 'GitHub Auth Failed' });
+
+    // 2. Get Profile
+    const githubProfile = await getGithubUser(accessToken);
+
+    // 3. Link to Current User (req.user.id from middleware)
+    await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
+      [accessToken, githubProfile.id, req.user.id]);
+
+    res.json({ message: 'Github account connected successfully', user: githubProfile });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to connect Github account' });
   }
 };

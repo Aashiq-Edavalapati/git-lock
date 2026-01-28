@@ -7,6 +7,22 @@ import Button from "@/components/ui/Button";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
+// Helper code duplicated for isolation (or could be moved to components)
+const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
+
+import { Github, Mail } from "lucide-react";
+
+function SocialLoginButton({ icon: Icon, text, onClick }) {
+    return (
+        <button type="button" onClick={onClick} className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 p-3 rounded-lg text-white hover:bg-white/10 transition-colors">
+            <Icon size={18} />
+            <span>{text}</span>
+        </button>
+    )
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({ fullName: "", email: "", password: "", role: "CLIENT" });
@@ -26,6 +42,19 @@ export default function RegisterPage() {
     } finally {
         setIsLoading(false);
     }
+  };
+  
+  const handleSocialLogin = (provider) => {
+      // Save role to localStorage so callback page can use it
+      localStorage.setItem('oauth_role', formData.role);
+
+      const callbackUrl = `${FRONTEND_URL}/auth/${provider}/callback`;
+      
+      if (provider === 'github') {
+          window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${callbackUrl}&scope=user:email repo`;
+      } else {
+          window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${callbackUrl}&response_type=code&scope=email profile`;
+      }
   };
 
   return (
@@ -73,6 +102,16 @@ export default function RegisterPage() {
                <Button className="w-full h-12 flex items-center justify-center gap-2" disabled={isLoading}>
                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : <><UserPlus size={18} /> Register</>}
                </Button>
+               
+               <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-black px-2 text-gray-500">Or continue with</span></div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-3">
+                  <SocialLoginButton icon={Github} text="Github" onClick={() => handleSocialLogin('github')} />
+                  <SocialLoginButton icon={Mail} text="Google" onClick={() => handleSocialLogin('google')} /> 
+               </div>
            </form>
 
            <div className="mt-6 text-center text-sm text-gray-500">

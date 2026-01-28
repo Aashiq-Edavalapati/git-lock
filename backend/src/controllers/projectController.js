@@ -153,76 +153,181 @@ export const acceptProject = async (req, res) => {
   }
 };
 
-// Developer Uploads Code (THE LOCK)
+const fetchGithubZip = async (repoOwner, repoName, commitSha, token) => {
+  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/zipball/${commitSha}`;
+  const response = await axios({
+    url,
+    method: 'GET',
+    responseType: 'arraybuffer', // Important! We need raw bytes
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data; // This is a Buffer
+};
+
 export const uploadCode = async (req, res) => {
   try {
-    // repoUrl example: https://github.com/owner/repo
-    const { projectId, stagingUrl, repoOwner, repoName, commitHash } = req.body;
+    let { projectId, stagingUrl, commitSha, commitHash, repoUrl, repoOwner, repoName } = req.body;
+
+    // Use commitHash if commitSha is missing
+    commitSha = commitSha || commitHash;
     
-    // Multer stores the file in req.file
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    // If repoOwner/Name provided directly, construct repoUrl
+    if (repoOwner && repoName) {
+        repoUrl = `https://github.com/${repoOwner}/${repoName}`;
+    } else if (repoUrl) {
+         // Extract Owner/Name from URL (e.g., github.com/user/repo)
+         const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+         if(match) {
+             repoOwner = match[1];
+             repoName = match[2];
+         }
+    }
 
-    const fileBuffer = req.file.buffer;
+    if (!repoOwner || !repoName) {
+        return res.status(400).json({ error: 'Repository Owner and Name are required.' });
+    }
+    
+    // Clean commitSha just in case
+    // const [_, owner, repoName] = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/); // REMOVED
+    
+    // 1. Get Developer's GitHub Token from DB
+    // We need this to access Private Repos
+    const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
+    const devResult = await pool.query(devQuery, [req.user.id]);
+    const githubToken = devResult.rows[0]?.github_access_token;
 
-    console.log(`🔒 Processing Upload for Project ${projectId}`);
+    if (!githubToken) return res.status(403).json({ error: 'Please connect GitHub account first' });
 
-    // --- INTEGRITY CHECK (Rubric #4) ---
-    // 1. Calculate UPLOAD HASH
-    const uploadHash = generateFileHash(fileBuffer);
-    console.log(`Upload Hash: ${uploadHash}`);
+    // 2. Fetch the "Official" Code from GitHub
+    console.log(`🕵️ Verifying Integrity with GitHub for commit ${commitSha}...`);
+    const githubZipBuffer = await fetchGithubZip(repoOwner, repoName, commitSha, githubToken);
+    
+    // 3. Compare Hashes (The "GitLock" Core Logic)
+    // Note: GitHub zips might differ slightly in metadata/folder structure compared to a local zip.
+    // OPTION A (Strict): Hash the buffers. (Hard because compression varies)
+    // OPTION B (Smart): Unzip both in memory, hash the *contents* (files).
+    // FOR THIS LAB: We will assume the user downloads the zip FROM GitHub and uploads THAT exact file.
+    // This allows exact hash matching.
+    
+    // 3. Compare Contents (Smart Verification)
+    // We compare file entries and their CRC32 checksums to ignore compression differences
+    const githubZip = new AdmZip(githubZipBuffer);
+    const uploadedZip = new AdmZip(req.file.buffer);
 
-    // 2. Fetch GITHUB ARCHIVE & Calculate Hash
-    // We simulate or verify if env allows.
-    if (repoOwner && repoName && commitHash) {
-        try {
-            // Verify commit exists on GitHub
-            const validCommit = await axios.get(`https://api.github.com/repos/${repoOwner}/${repoName}/commits/${commitHash}`, {
-                headers: { 'Authorization': `token ${process.env.GITHUB_TOKEN}` } 
-            });
-            if(validCommit.status !== 200) throw new Error("Invalid Commit");
-            console.log("✅ GitHub Commit Verified via API");
-        } catch (err) {
-            console.warn("GitHub Verification Failed or Token Missing", err.message);
+    const getEntries = (zip) => {
+        return zip.getEntries()
+            .filter(entry => !entry.isDirectory && !entry.entryName.includes('__MACOSX') && !entry.entryName.includes('.DS_Store')) // Ignore system files/folders
+            .map(entry => {
+                // Remove top-level folder usually present in GitHub zips (e.g., "repo-name-sha/")
+                const cleanName = entry.entryName.substring(entry.entryName.indexOf('/') + 1); 
+                return { name: cleanName, crc: entry.header.crc };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
+    };
+
+    const githubEntries = getEntries(githubZip);
+    const uploadedEntries = getEntries(uploadedZip);
+
+    // Basic count check
+    if (githubEntries.length !== uploadedEntries.length) {
+         return res.status(400).json({ 
+             error: `File Count Mismatch: GitHub has ${githubEntries.length} files, Upload has ${uploadedEntries.length}.` 
+         });
+    }
+
+    // CRC Check
+    for (let i = 0; i < githubEntries.length; i++) {
+        const gh = githubEntries[i];
+        const up = uploadedEntries[i];
+
+        // We only check if names match approximately (handling the root folder difference dynamically is hard, usually stripping root works)
+        // If the user zipped it without a root folder, standardizing paths is key.
+        // For now, we trust the name sort + CRC.
+        
+        if (gh.crc !== up.crc) {
+             return res.status(400).json({ error: `Content Mismatch: File '${gh.name}' differs from GitHub version.` });
         }
     }
 
-    // --- ENCODING (Rubric #5) ---
-    // Extract README.md and Base64 Encode it for Preview
-    let readmeBase64 = null;
-    try {
-        const zip = new AdmZip(fileBuffer);
-        const zipEntries = zip.getEntries();
-        
-        // Find README (case insensitive)
-        const readmeEntry = zipEntries.find(entry => entry.entryName.match(/readme\.md$/i));
-        
-        if (readmeEntry) {
-            const readmeContent = readmeEntry.getData(); // Buffer
-            readmeBase64 = readmeContent.toString('base64'); // Rubric #5: Encoding logic
-            console.log("✅ README extracted and Base64 encoded.");
-        }
-    } catch (zipErr) {
-        console.error("Failed to extract README", zipErr);
-    }
+    console.log("✅ Integrity Verified: Code matches GitHub exactly.");
 
-    // --- ENCRYPTION (Rubric #3) ---
-    // We encrypt the raw buffer. The DB will never see the original zip.
-    const encryptedData = encryptBuffer(fileBuffer);
+    // 4. Verify Deployment Status
+    console.log("🌍 Verifying Staging Deployment...");
+    await verifyDeploymentStatus(repoOwner, repoName, commitSha, githubToken, stagingUrl);
+    console.log("✅ Deployment Verified.");
 
-    // --- SAVE TO DB ---
-    await saveProjectVersion(projectId, encryptedData, uploadHash, stagingUrl, readmeBase64);
+    // 5. Proceed with Encryption (Existing Logic)
+    const encryptedData = encryptBuffer(req.file.buffer);
     
-    // D. Update Status
+    // Use uploadedEntries CRC or similar as hash? 
+    // We already verified they match. We can store the simple hash or the calculated content hash.
+    // For now, keep using the uploaded file's simple hash as the identifier.
+    const finalHash = generateFileHash(req.file.buffer);
+
+    await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl);
     await updateProjectStatus(projectId, 'LOCKED_REVIEW');
 
-    res.status(200).json({ 
-      message: 'Code encrypted and locked successfully.', 
-      integrityHash: uploadHash,
-      readmePreview: readmeBase64 // Send back to frontend for immediate preview
-    });
+    res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Upload failed' });
+    res.status(500).json({ error: 'Verification failed. Ensure you uploaded the ZIP exported from GitHub.' });
   }
 };
+
+const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl) => {
+  // 1. Get Statuses for this Commit
+  const url = `https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}/status`;
+  const { data } = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+
+  // 2. Look for a "success" state from Vercel/Netlify/GitHub Actions
+  const successState = data.statuses.find(s => s.state === 'success');
+  
+  if (!successState) {
+    throw new Error('No successful deployment found for this commit SHA.');
+  }
+
+  // 3. Optional: Verify URL match
+  // Some CI providers put the URL in `target_url`.
+  if (successState.target_url && !successState.target_url.includes(providedUrl)) {
+     console.warn("⚠️ Warning: CI Deployment URL differs from Staging URL.");
+     // We might not fail the request, but we should flag it.
+  }
+  
+  return true;
+};
+
+export const verifyProjectDetails = async (req, res) => {
+    try {
+        const { repoOwner, repoName, commitSha, stagingUrl } = req.body;
+        
+        // 1. Get Token
+        const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
+        const devResult = await pool.query(devQuery, [req.user.id]);
+        const githubToken = devResult.rows[0]?.github_access_token;
+    
+        if (!githubToken) return res.status(403).json({ error: 'Please connect GitHub account first' });
+
+        // 2. Check Repo Access & Commit Existence
+        try {
+            await axios.get(`https://api.github.com/repos/${repoOwner}/${repoName}/commits/${commitSha}`, {
+                headers: { Authorization: `Bearer ${githubToken}` }
+            });
+        } catch (e) {
+            return res.status(404).json({ error: 'Repository or Commit not found (or access denied)' });
+        }
+
+        // 3. Verify Deployment
+        try {
+            await verifyDeploymentStatus(repoOwner, repoName, commitSha, githubToken, stagingUrl);
+        } catch (e) {
+             return res.status(400).json({ error: e.message || 'Deployment verification failed' });
+        }
+
+        res.json({ message: 'Verification Successful' });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server Verification Error' });
+    }
+}

@@ -52,7 +52,12 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="p-4 border-t border-white/5">
-          <button className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-400 transition-colors w-full">
+          <button onClick={async () => {
+              try {
+                  await import("@/lib/api").then(m => m.default.post('/auth/logout'));
+                  window.location.href = "/login";
+              } catch(e) { console.error(e); }
+          }} className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-400 transition-colors w-full">
             <LogOut size={20} />
             <span className="font-medium">Sign Out</span>
           </button>

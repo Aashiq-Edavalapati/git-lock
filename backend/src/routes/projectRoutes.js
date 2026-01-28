@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -24,5 +24,8 @@ router.post('/accept', authenticateToken, requireRole('DEVELOPER'), acceptProjec
 
 // Developer uploads code
 router.post('/upload', authenticateToken, requireRole('DEVELOPER'), upload.single('sourceCode'), uploadCode);
+
+// Verification Endpoint
+router.post('/verify-details', authenticateToken, requireRole('DEVELOPER'), verifyProjectDetails);
 
 export default router;
