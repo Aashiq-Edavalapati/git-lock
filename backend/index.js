@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import pool from './src/config/db.js';
 import authRoutes from './src/routes/authRoutes.js';
 import projectRoutes from './src/routes/projectRoutes.js';
+import paymentRoutes from './src/routes/paymentRoutes.js';
 import cookieParser from 'cookie-parser';
 
 dotenv.config();
@@ -17,6 +18,7 @@ app.use(cookieParser());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/', (req, res) => {
   res.send('GitLock Secure API is Running...');
