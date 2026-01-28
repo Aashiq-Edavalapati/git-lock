@@ -45,12 +45,16 @@ export const getProject = async (req, res) => {
     
     // Include version details if locked
     if (project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') {
-        const versionQuery = `SELECT * FROM project_versions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1`;
+        const versionQuery = `
+          SELECT id, project_id, zip_hash, staging_url, commit_sha, repo_url, created_at, readme_preview 
+          FROM project_versions 
+          WHERE project_id = $1 
+          ORDER BY created_at DESC LIMIT 1
+        `;
         const versionResult = await pool.query(versionQuery, [id]);
         if (versionResult.rows.length > 0) {
             project.version = versionResult.rows[0];
-            // Don't send encrypted_blob, but send readme_preview
-            delete project.version.encrypted_blob;
+            // No need to delete encrypted_blob anymore
         }
     }
 

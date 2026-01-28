@@ -156,7 +156,7 @@ export default function EscrowPage({ params }) {
             prefill: {
                 name: currentUser.name,
                 email: currentUser.email,
-                contact: "9999999999", // Default to prevent region lock
+                contact: "9999999999", 
             },
             theme: { color: "#3399cc" },
             // retry: { enabled: false }, // Re-enabled default retry
@@ -207,14 +207,13 @@ export default function EscrowPage({ params }) {
                 <div className="space-y-4">
                     <h3 className="text-xl font-bold text-white text-center">Files Accessible</h3>
                     
-                    <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-center">
-                         <Button 
-                            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-8 py-3"
-                        >
-                            <FileCode className="mr-2" size={20}/> Download Source Code
-                        </Button>
-                    </div>
+                    
+                    <Button 
+                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`)}
+                        className="mx-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                    >
+                        <FileCode className="mr-2" size={20}/> Download Source Code
+                    </Button>
 
                     <div className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-2">
                         {/* Rubric #5: Encoding/Decoding Visual Proof */}

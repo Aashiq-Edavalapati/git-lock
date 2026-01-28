@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, UserPlus, FileCode, CheckCircle2, Loader2, ArrowRight, Lock, Unlock } from "lucide-react";
@@ -103,8 +105,8 @@ function ProjectCard({ project, onInvite }) {
         {/* If status is LOCKED_REVIEW or COMPLETED, show button */}
         {(project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') ? (
           <Link href={`/dashboard/escrow/${project.id}`}>
-            <Button variant={project.status === 'COMPLETED' ? 'success' : 'outline'} className="h-10">
-              {project.status === 'COMPLETED' ? <Unlock size={16} /> : <Lock size={16} />} View Vault
+            <Button variant={project.status === 'COMPLETED' ? 'default' : 'outline'} className="h-10 flex items-center gap-2 border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all">
+              {project.status === 'COMPLETED' ? <Unlock size={16} className="text-green-400" /> : <Lock size={16} />} View Vault
             </Button>
           </Link>
         ) : (
