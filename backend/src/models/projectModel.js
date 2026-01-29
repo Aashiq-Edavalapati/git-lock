@@ -34,3 +34,38 @@ export const updateProjectStatus = async (projectId, status) => {
   const query = `UPDATE projects SET status = $1 WHERE id = $2`;
   await pool.query(query, [status, projectId]);
 };
+
+// Update Project Details
+export const updateProject = async (id, title, description, budget) => {
+    const query = `
+      UPDATE projects 
+      SET title = $1, description = $2, budget = $3
+      WHERE id = $4
+      RETURNING *;
+    `;
+    const result = await pool.query(query, [title, description, budget, id]);
+    return result.rows[0];
+};
+
+// Delete Project
+export const deleteProject = async (id) => {
+    // Manually delete related records to avoid Foreign Key constraint violations
+    
+    // 1. Delete Lock Requests
+    try {
+        await pool.query('DELETE FROM lock_requests WHERE project_id = $1', [id]);
+    } catch (e) {
+        console.warn('Checking lock_requests cleanup:', e.message);
+    }
+
+    // 2. Delete Project Versions (The code backups)
+    try {
+        await pool.query('DELETE FROM project_versions WHERE project_id = $1', [id]);
+    } catch (e) {
+        console.warn('Checking project_versions cleanup:', e.message);
+    }
+
+    // 3. Delete Project
+    const result = await pool.query('DELETE FROM projects WHERE id = $1 RETURNING *', [id]);
+    return result.rows[0];
+};
