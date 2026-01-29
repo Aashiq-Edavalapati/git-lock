@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db.js';
-import { createUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
+import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
 import { sendMFAEmail } from '../utils/emailService.js';
 import { generateToken } from '../utils/jwtService.js';
@@ -240,6 +240,64 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+};
+
+
+
+export const initiateDeleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { email } = await findUserById(userId);
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiry = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    await saveMFASecret(userId, otpHash, expiry);
+    
+    // In real app, send email. For now, log it clearly.
+    console.log(`[SECURE DELETE] OTP for ${email}: ${otp}`);
+    await sendMFAEmail(email, otp);
+
+    res.json({ message: 'OTP sent to email' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to initiate delete process' });
+  }
+};
+
+export const deleteAccount = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) return res.status(400).json({ error: 'OTP is required' });
+
+    const userId = req.user.id;
+    const secretData = await getMFASecret(userId);
+    
+    if (!secretData) return res.status(400).json({ error: 'Session expired. Please try again.' });
+
+    const [hashedOtp, expiryStr] = secretData.split('|');
+    if (Date.now() > parseInt(expiryStr)) {
+      return res.status(400).json({ error: 'OTP Expired' });
+    }
+
+    const isValid = await bcrypt.compare(otp, hashedOtp);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid OTP' });
+    }
+
+    // Proceed with deletion
+    const { deleteUser } = await import('../models/userModel.js');
+    await deleteUser(userId);
+    
+    await clearMFASecret(userId);
+    res.clearCookie('token');
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 };
 

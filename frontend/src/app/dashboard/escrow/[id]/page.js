@@ -11,6 +11,8 @@ export default function EscrowPage({ params }) {
   const [showPay, setShowPay] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
 
   // Helper to get Razorpay
   const loadRazorpay = () => {
@@ -46,12 +48,15 @@ export default function EscrowPage({ params }) {
   const canViewFiles = isDev || isPaid;
 
   const handleAcceptProject = async () => {
+    setIsAccepting(true);
     try {
         await api.post('/projects/accept', { projectId: project.id });
         fetchProject(); // Refresh state
         alert("Project Accepted!");
     } catch (err) {
         alert("Failed to accept: " + (err.response?.data?.error || err.message));
+    } finally {
+        setIsAccepting(false);
     }
   };
 
@@ -70,7 +75,9 @@ export default function EscrowPage({ params }) {
                     <div className="flex justify-between text-sm"><span className="text-gray-400">Client</span><span className="text-white">Yes</span></div>
                 </div>
                 {isDev ? (
-                    <Button onClick={handleAcceptProject} className="w-full h-12">Accept Project</Button>
+                    <Button onClick={handleAcceptProject} className="w-full h-12" disabled={isAccepting}>
+                        {isAccepting ? 'Accepting Project...' : 'Accept Project'}
+                    </Button>
                 ) : (
                     <div className="text-yellow-500 text-sm bg-yellow-500/10 p-2 rounded">Waiting for developer response...</div>
                 )}
@@ -163,6 +170,7 @@ export default function EscrowPage({ params }) {
             modal: {
                 ondismiss: function() {
                     console.log('Checkout form closed');
+                    setIsPaymentProcessing(false);
                 }
             }
         };
@@ -179,6 +187,7 @@ export default function EscrowPage({ params }) {
     } catch (err) {
         console.error(err);
         alert("Payment Intiaiization Failed");
+        setIsPaymentProcessing(false);
     }
   };
 
@@ -255,7 +264,11 @@ export default function EscrowPage({ params }) {
                         </div>
                     </div>
                     {/* Only Client sees Pay Button */}
-                    {!isDev && <Button onClick={handlePayment} className="w-full h-12">Pay ₹{project.budget} to Unlock</Button>}
+                    {!isDev && (
+                        <Button onClick={() => { setIsPaymentProcessing(true); handlePayment(); }} className="w-full h-12" disabled={isPaymentProcessing}>
+                            {isPaymentProcessing ? 'Processing Payment...' : `Pay ₹${project.budget} to Unlock`}
+                        </Button>
+                    )}
                 </div>
              )}
           </div>

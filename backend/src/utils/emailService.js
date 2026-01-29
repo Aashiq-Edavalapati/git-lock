@@ -43,3 +43,19 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
     console.error('❌ Invite Email failed:', error);
   }
 };
+
+export const sendNotificationEmail = async (email, subject, text) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: subject,
+    text: text
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Notification Email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Notification Email failed:', error);
+  }
+};

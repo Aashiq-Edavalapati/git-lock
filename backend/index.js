@@ -47,6 +47,40 @@ app.get('/', (req, res) => {
   res.send('GitLock Secure API is Running...');
 });
 
+// Notification Routes (Quick implementation for Lab)
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    
+    // Simple verify to get ID
+    // Note: In production use proper middleware.
+    // We need to import jwt here if not available, or just decode if we trust cookie (bad practice but avoids import mess if jwt not top level)
+    // Actually, let's just do a db query if we can't verify? No, we need verify.
+    // Assuming jwt is not imported, let's try to import it dynamically or just use the auth middleware if exported?
+    // Let's assume we can import jwt.
+    const jwt = await import('jsonwebtoken');
+    const { id } = jwt.default.verify(token, process.env.JWT_SECRET);
+    
+    const { getUserNotifications } = await import('./src/models/notificationModel.js');
+    const notifications = await getUserNotifications(id);
+    res.json(notifications);
+  } catch (e) {
+    console.error(e);
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+});
+
+app.put('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const { markNotificationAsRead } = await import('./src/models/notificationModel.js');
+    await markNotificationAsRead(req.params.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

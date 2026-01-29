@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   User, Github, CreditCard, Shield, 
@@ -12,8 +12,10 @@ import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("profile"); // profile, billing, security
+  const activeTabDefault = "profile";
+  const [activeTab, setActiveTab] = useState(activeTabDefault); // profile, billing, security
   const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userData, setUserData] = useState({
     name: "",
     email: "",
@@ -55,6 +57,11 @@ export default function SettingsPage() {
       setLoading(false);
     }
   };
+
+  const handleDeleteClick = () => {
+     setShowDeleteModal(true); 
+  };
+
 
   const connectGithub = () => {
     const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -198,10 +205,15 @@ export default function SettingsPage() {
                  <p className="text-xs text-gray-400 mb-4">
                     Deleting your account will permanently remove all locked contracts and encryption keys. This action cannot be undone.
                  </p>
-                 <Button variant="danger" className="bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white">
+                 <Button onClick={handleDeleteClick} variant="danger" className="bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white">
                     Delete Account
                  </Button>
               </div>
+
+               {/* Secure Delete Modal */}
+               {showDeleteModal && (
+                <DeleteConfirmationModal onClose={() => setShowDeleteModal(false)} />
+              )}
            </motion.div>
         )}
 
@@ -219,3 +231,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
