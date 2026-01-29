@@ -179,7 +179,6 @@ export const uploadCode = async (req, res) => {
   try {
     let { projectId, stagingUrl, commitSha, repoUrl, repoOwner, repoName } = req.body;
 
-    // Use commitHash if commitSha is missing
     commitSha = commitSha;
     
     // If repoOwner/Name provided directly, construct repoUrl
@@ -198,8 +197,7 @@ export const uploadCode = async (req, res) => {
         return res.status(400).json({ error: 'Repository Owner and Name are required.' });
     }
     
-    // Get Developer's GitHub Token from DB
-    // We need this to access Private Repos
+    // Get Developer's GitHub Token from DB to access private repos
     const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
     const devResult = await pool.query(devQuery, [req.user.id]);
     const githubToken = devResult.rows[0]?.github_access_token;
@@ -210,7 +208,7 @@ export const uploadCode = async (req, res) => {
     console.log(`🕵️ Verifying Integrity with GitHub for commit ${commitSha}...`);
     const githubZipBuffer = await fetchGithubZip(repoOwner, repoName, commitSha, githubToken);
     
-    // Compare Hashes (The "GitLock" Core Logic)
+    // Compare Hashes
     const githubZip = new AdmZip(githubZipBuffer);
     const uploadedZip = new AdmZip(req.file.buffer);
 
@@ -252,7 +250,7 @@ export const uploadCode = async (req, res) => {
     await verifyDeploymentStatus(repoOwner, repoName, commitSha, githubToken, stagingUrl);
     console.log("✅ Deployment Verified.");
 
-    // Proceed with Encryption (Existing Logic)
+    // Proceed with Encryption
     const encryptedData = encryptBuffer(req.file.buffer);
     
     const finalHash = generateFileHash(req.file.buffer);
@@ -272,41 +270,60 @@ export const uploadCode = async (req, res) => {
 };
 
 const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl) => {
-  // 1. Get Statuses for this Commit
-  const url = `https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}/status`;
-  const { data } = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+  const headers = { 
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json" 
+  };
 
-  // 2. Look for a "success" state from Vercel/Netlify/GitHub Actions
-  const successState = data.statuses.find(s => s.state === 'success');
-  
-  if (!successState) {
-    throw new Error('No successful deployment found for this commit SHA.');
+  // Normalize Provided URL: Remove trailing slash if present
+  const cleanProvidedUrl = providedUrl ? providedUrl.replace(/\/$/, "") : providedUrl;
+
+  // Get Deployments for this specific commit
+  const deployUrl = `https://api.github.com/repos/${owner}/${repo}/deployments?sha=${commitSha}`;
+  const { data: deployments } = await axios.get(deployUrl, { headers });
+
+  if (!deployments || deployments.length === 0) {
+    throw new Error('No deployments found for this commit SHA.');
   }
-  console.log("[DEBUG]: success state", successState);
-  console.log("[DEBUG]: provided url", providedUrl);
-  console.log("[DEBUG]: target url", successState.target_url);
-  // 3. Optional: Verify URL match
-  // Some CI providers put the URL in `target_url`.
-  if (successState.target_url && !successState.target_url.includes(providedUrl)) {
-     console.warn("⚠️ Warning: CI Deployment URL differs from Staging URL.");
-     // We might not fail the request, but we should flag it.
+
+  // Get the statuses for the most recent deployment
+  const deploymentId = deployments[0].id;
+  const statusUrl = `https://api.github.com/repos/${owner}/${repo}/deployments/${deploymentId}/statuses`;
+  const { data: statuses } = await axios.get(statusUrl, { headers });
+
+  // Find the "success" state
+  const successStatus = statuses.find(s => s.state === 'success');
+
+  if (!successStatus) {
+    throw new Error('No successful deployment status found.');
   }
-  
-  return true;
+
+  // Extract the actual live URL
+  const actualUrl = successStatus.environment_url;
+
+  console.log("[DEBUG]: Actual Deployed URL:", actualUrl);
+  console.log("[DEBUG]: Provided URL (Cleaned):", cleanProvidedUrl);
+
+  // Compare using the cleaned URL
+  if (actualUrl && !actualUrl.includes(cleanProvidedUrl)) {
+    console.warn("⚠️ Warning: CI Deployment URL differs from Staging URL.");
+  }
+
+  return actualUrl;
 };
 
 export const verifyProjectDetails = async (req, res) => {
     try {
         const { repoOwner, repoName, commitSha, stagingUrl } = req.body;
         
-        // 1. Get Token
+        // Get Token
         const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
         const devResult = await pool.query(devQuery, [req.user.id]);
         const githubToken = devResult.rows[0]?.github_access_token;
     
         if (!githubToken) return res.status(403).json({ error: 'Please connect GitHub account first' });
 
-        // 2. Check Repo Access & Commit Existence
+        // Check Repo Access & Commit Existence
         try {
             await axios.get(`https://api.github.com/repos/${repoOwner}/${repoName}/commits/${commitSha}`, {
                 headers: { Authorization: `Bearer ${githubToken}` }
@@ -315,7 +332,7 @@ export const verifyProjectDetails = async (req, res) => {
             return res.status(404).json({ error: 'Repository or Commit not found (or access denied)' });
         }
 
-        // 3. Verify Deployment
+        // Verify Deployment
         try {
             await verifyDeploymentStatus(repoOwner, repoName, commitSha, githubToken, stagingUrl);
         } catch (e) {

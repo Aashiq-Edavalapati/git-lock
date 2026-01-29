@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import razorpay from '../config/razorpay.js';
 import pool from '../config/db.js';
-import pool from '../config/db.js';
 
 // 1. Create Payment Order
 export const createOrder = async (req, res) => {
