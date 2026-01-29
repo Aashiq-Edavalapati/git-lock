@@ -6,7 +6,7 @@ import {
   LayoutDashboard, PlusCircle, 
   Settings, LogOut, FileCode, Menu, Bell 
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 const sidebarItems = [
@@ -20,6 +20,21 @@ const sidebarItems = [
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [role, setRole] = useState(null);
+
+  useEffect(() => {
+    // Determine Role for sidebar filtering
+    const fetchRole = async () => {
+        try {
+            // We can check localStorage or make a quick call. 
+            // Since this is layout, let's try reading from a lighter endpoint or just /auth/me
+            // Note: This might cause a delay in sidebar updating on first load, but acceptable for now.
+            const { data } = await import("@/lib/api").then(m => m.default.get('/auth/me'));
+            setRole(data.role);
+        } catch(e) {}
+    }
+    fetchRole();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex relative overflow-hidden">
@@ -39,6 +54,9 @@ export default function DashboardLayout({ children }) {
 
         <nav className="flex-1 px-4 space-y-2">
           {sidebarItems.map((item) => {
+            // "New Lock" (PlusCircle) is only for DEVELOPER
+            if (item.label === "New Lock" && role !== "DEVELOPER") return null;
+
             const isActive = pathname === item.href;
             return (
               <Link key={item.href} href={item.href}>

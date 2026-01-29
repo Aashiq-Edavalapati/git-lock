@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -27,6 +27,11 @@ router.post('/upload', authenticateToken, requireRole('DEVELOPER'), upload.singl
 
 // Verification Endpoint
 router.post('/verify-details', authenticateToken, requireRole('DEVELOPER'), verifyProjectDetails);
-router.get('/:id/download', authenticateToken, downloadCode); // New Endpoint
+router.get('/:id/download', authenticateToken, downloadCode); 
+
+// Advanced Lock Management
+router.post('/lock-request', authenticateToken, requireRole('DEVELOPER'), requestLockModification);
+router.post('/lock-approve', authenticateToken, requireRole('CLIENT'), approveLockModification);
+router.get('/:id/lock-requests', authenticateToken, getProjectLockRequests);
 
 export default router;

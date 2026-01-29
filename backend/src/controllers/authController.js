@@ -233,6 +233,29 @@ export const updateProfile = async (req, res) => {
 
 
 
+export const requestOTP = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { email } = await findUserById(userId);
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiry = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    await saveMFASecret(userId, otpHash, expiry);
+    
+    // In production, send email. For lab/demo, log it.
+    console.log(`[ACTION OTP] for ${email}: ${otp}`);
+    await sendMFAEmail(email, otp);
+
+    res.json({ message: 'OTP sent to email' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
 export const initiateDeleteAccount = async (req, res) => {
   try {
     const userId = req.user.id;

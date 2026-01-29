@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import api from "@/lib/api";
+import Link from "next/link";
 
 export default function Notifications() {
     const [notifications, setNotifications] = useState([]);
@@ -28,7 +29,7 @@ export default function Notifications() {
             await api.put(`/notifications/${id}/read`);
             setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
             setHasUnread(notifications.some(n => !n.is_read && n.id !== id));
-        } catch (e) { }
+        } catch (e) { console.error(e); }
     };
 
     return (
@@ -67,6 +68,11 @@ export default function Notifications() {
                                 </div>
                             ))
                         )}
+                    </div>
+                    <div className="p-3 border-t border-white/5 bg-black/20 text-center">
+                        <Link href="/dashboard/notifications" className="text-xs text-primary hover:text-white transition-colors">
+                            View All Notifications
+                        </Link>
                     </div>
                 </div>
             )}

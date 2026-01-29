@@ -21,7 +21,19 @@ const runMigration = async () => {
         await pool.query(`ALTER TABLE project_versions ADD COLUMN IF NOT EXISTS repo_url TEXT;`);
         await pool.query(`ALTER TABLE project_versions ADD COLUMN IF NOT EXISTS commit_sha TEXT;`);
         
-        console.log("✅ Database Migration Checked: OAuth columns exist.");
+        // 5. Lock Requests Table (Advanced Feature)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS lock_requests (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+        requester_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        request_type TEXT NOT NULL, -- 'UNLOCK' or 'DELETE'
+        status TEXT DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED'
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("✅ Database Tables Verified/Created");
     } catch (err) {
         console.error("Migration Failed:", err.message);
     }

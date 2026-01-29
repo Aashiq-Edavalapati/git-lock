@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ShieldCheck, Lock, Unlock } from "lucide-react";
+import { ShieldCheck, Lock, Unlock, Plus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import api from "@/lib/api";
+import Notifications from "./Notifications";
 
 export default function DeveloperView() {
   const [projects, setProjects] = useState([]);
@@ -13,9 +14,20 @@ export default function DeveloperView() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold mb-1">Developer Console</h1>
-        <p className="text-gray-400 text-sm">Manage incoming jobs.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold mb-1">Developer Console</h1>
+          <p className="text-gray-400 text-sm">Manage incoming jobs.</p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Notifications />
+          <Link href="/dashboard/create">
+            <Button className="rounded-full px-6 flex items-center gap-2">
+              <Plus size={18} /> Create Lock
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4">

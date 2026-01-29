@@ -2,17 +2,23 @@
 
 import { use, useState, useEffect } from "react";
 import api from "@/lib/api";
-import { Lock, Unlock, ShieldCheck, FileCode } from "lucide-react";
+import { ShieldCheck, Download, Lock, AlertTriangle, RefreshCw } from "lucide-react";
 import Button from "@/components/ui/Button";
+import LockRequestModal from "@/components/dashboard/LockRequestModal";
 
 export default function EscrowPage({ params }) {
   const { id } = use(params);
   const [project, setProject] = useState(null);
-  const [showPay, setShowPay] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+
+  // Advanced Lock State
+  const [lockRequests, setLockRequests] = useState([]);
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   // Helper to get Razorpay
   const loadRazorpay = () => {
@@ -26,21 +32,34 @@ export default function EscrowPage({ params }) {
     });
   };
 
-  const fetchProject = () => {
-      api.get(`/projects/${id}`)
-        .then(res => setProject(res.data))
-        .catch(console.error)
-        .finally(() => setLoading(false));
+  const fetchProjectData = async () => { // Renamed from fetchProject
+    try {
+        const [projRes, userRes, reqRes] = await Promise.all([
+            api.get(`/projects/${id}`),
+            api.get('/auth/me'),
+            api.get(`/projects/${id}/lock-requests`).catch(() => ({ data: [] })) // Soft fail
+        ]);
+        
+        setProject(projRes.data);
+        setCurrentUser(userRes.data);
+        setLockRequests(reqRes.data);
+        
+        // Check for pending requests
+        const pending = reqRes.data.find(r => r.status === 'PENDING');
+        setPendingRequest(pending);
+
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch project data:", err);
+        setLoading(false);
+      }
   };
   
   useEffect(() => {
-    // 1. Get User
-    api.get('/auth/me').then(res => setCurrentUser(res.data)).catch(() => {});
-    // 2. Get Project
-    fetchProject();
+    fetchProjectData();
   }, [id]);
 
-  if (loading || !project || !currentUser) return <div className="text-white p-20 text-center">Loading Vault...</div>;
+  if (loading) return <div className="p-20 text-center text-white">Loading Vault...</div>;
 
 
   const isDev = currentUser.role === 'DEVELOPER';
@@ -51,13 +70,26 @@ export default function EscrowPage({ params }) {
     setIsAccepting(true);
     try {
         await api.post('/projects/accept', { projectId: project.id });
-        fetchProject(); // Refresh state
+        fetchProjectData(); // Refresh state
         alert("Project Accepted!");
     } catch (err) {
         alert("Failed to accept: " + (err.response?.data?.error || err.message));
     } finally {
         setIsAccepting(false);
     }
+  };
+
+  const handleRequestUnlock = async () => {
+      if(!confirm("Request to unlock this project? This will allow you to upload a new version.")) return;
+      setIsRequesting(true);
+      try {
+          await api.post('/projects/lock-request', { projectId: project.id, requestType: 'UNLOCK' });
+          fetchProjectData(); // Refresh to see pending state
+      } catch(e) {
+          alert("Failed to request unlock");
+      } finally {
+          setIsRequesting(false);
+      }
   };
 
   // --- STATE 1: INVITE SENT (Developer Viewing) ---
@@ -147,7 +179,7 @@ export default function EscrowPage({ params }) {
                     });
 
                     alert("Payment Successful! Code Unlocked.");
-                    fetchProject(); // Refresh UI to show UNLOCKED state
+                    fetchProjectData(); // Refresh UI to show UNLOCKED state
 
                     // 2. Trigger Download (Optional auto-download)
                     // We can redirect/open new tab for download or fetch blob
@@ -200,14 +232,49 @@ export default function EscrowPage({ params }) {
           </div>
        </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Main Vault Panel */}
-          <div className="md:col-span-2 glass-card p-8 rounded-2xl relative overflow-hidden">
+       {/* --- ALERTS --- */}
+      {/* 1. Pending Lock Request Alert */}
+      {pendingRequest && (
+          <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                  <AlertTriangle className="text-yellow-500" />
+                  <div>
+                      <h3 className="text-yellow-500 font-bold">Unlock Requested</h3>
+                      <p className="text-gray-400 text-sm">
+                          {currentUser.role === 'CLIENT' 
+                            ? "The developer has requested to unlock this project for updates." 
+                            : "You have requested to unlock this project. Waiting for client approval."}
+                      </p>
+                  </div>
+              </div>
+              {currentUser.role === 'CLIENT' && (
+                  <Button onClick={() => setShowApproveModal(true)} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                      Review & Approve
+                  </Button>
+              )}
+          </div>
+      )}
+
+      {/* 2. Lock Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="glass-card p-8 rounded-2xl border-white/5 space-y-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Smart Lock Vault</h2>
+              <p className="text-gray-400 text-sm">Encrypted Source Code & Assets</p>
+            </div>
+            {/* Developer Action: Request Unlock */}
+            {currentUser.role === 'DEVELOPER' && !pendingRequest && (project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') && (
+                <button onClick={handleRequestUnlock} disabled={isRequesting} className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <RefreshCw size={12}/> {isRequesting ? 'Requesting...' : 'Request Unlock/Update'}
+                </button>
+            )}
+          </div>
              
              {/* Dynamic Icon */}
              <div className="flex justify-center mb-6">
                  <div className={`w-20 h-20 rounded-full flex items-center justify-center border-2 ${isPaid ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'}`}>
-                    {isPaid ? <Unlock size={32}/> : <Lock size={32}/>}
+                    {isPaid ? <Download size={32}/> : <Lock size={32}/>}
                  </div>
              </div>
 
@@ -221,7 +288,7 @@ export default function EscrowPage({ params }) {
                         onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`)}
                         className="mx-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3"
                     >
-                        <FileCode className="mr-2" size={20}/> Download Source Code
+                        <Download className="mr-2" size={20}/> Download Source Code
                     </Button>
 
                     <div className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-2">
@@ -255,7 +322,7 @@ export default function EscrowPage({ params }) {
                     
                     <div className="bg-black/40 p-4 rounded-xl space-y-2 border border-green-500/20 opacity-50">
                         <div className="flex items-center justify-between text-gray-400">
-                            <div className="flex items-center gap-3"><FileCode size={16}/> source_code.zip (Encrypted)</div>
+                            <div className="flex items-center gap-3"><Lock size={16}/> source_code.zip (Encrypted)</div>
                              {/* No Download Button for Client until paid */}
                         </div>
                     </div>
@@ -299,6 +366,18 @@ export default function EscrowPage({ params }) {
               )}
           </div>
        </div>
+
+       {/* Lock Approval Modal */}
+      {showApproveModal && (
+          <LockRequestModal 
+            requestId={pendingRequest?.id} 
+            onClose={() => setShowApproveModal(false)}
+            onSuccess={() => {
+                // Refresh data
+                fetchProjectData(); 
+            }}
+          />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Github, Upload, Lock, ArrowRight, CheckCircle2, FileArchive, Loader2, AlertTriangle, Check } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -23,8 +23,8 @@ function CreateLockForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const projectId = searchParams.get("projectId");
-  const budget = searchParams.get("budget");
+  const [projectId, setProjectId] = useState(searchParams.get("projectId") || null);
+  const [budget, setBudget] = useState(searchParams.get("budget") || "0"); // Default 0 if selecting later
 
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
@@ -42,6 +42,31 @@ function CreateLockForm() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [needsGithubConnection, setNeedsGithubConnection] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Project Selection State (if no projectId)
+  const [availableProjects, setAvailableProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (!projectId) {
+        setLoadingProjects(true);
+        api.get('/projects').then(res => {
+            // Filter: Only projects that Developer is part of AND DO NOT HAVE A LOCK (status === 'IN_PROGRESS' or 'INVITE_SENT' but likely IN_PROGRESS if they are creating lock)
+            // Actually, we usually only allow creating lock if status is IN_PROGRESS.
+            const validProjects = res.data.filter(p => p.status === 'IN_PROGRESS' || p.status === 'INVITE_SENT'); // INVITE_SENT technically shouldn't be here if dev is logged in as dev but safe to filter.
+            // Explicitly exclude LOCKED_REVIEW and COMPLETED
+            const unlockedProjects = validProjects.filter(p => p.status !== 'LOCKED_REVIEW' && p.status !== 'COMPLETED');
+            
+            setAvailableProjects(unlockedProjects);
+            setLoadingProjects(false);
+        }).catch(() => setLoadingProjects(false));
+    }
+  }, [projectId]);
+
+  const filteredProjects = availableProjects.filter(p => 
+      p.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // --- ACTIONS ---
 
@@ -115,7 +140,43 @@ function CreateLockForm() {
     }
   };
 
-  if (!projectId) return <div className="text-white text-center p-20">Access Denied</div>;
+  // if (!projectId) return <div className="text-white text-center p-20">Access Denied</div>; -> Removed this blocking check
+  
+  if (!projectId) {
+      return (
+          <div className="max-w-4xl mx-auto space-y-8 p-8">
+              <div className="flex justify-between items-center mb-6">
+                 <div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Select Project</h1>
+                    <p className="text-gray-400">Choose a project to create a lock for.</p>
+                 </div>
+                 <input 
+                    type="text" 
+                    placeholder="Search projects..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white w-64 focus:border-primary/50 outline-none"
+                 />
+              </div>
+              
+              {loadingProjects ? <div className="text-gray-400">Loading projects...</div> : 
+               filteredProjects.length === 0 ? <div className="text-gray-500 py-10 text-center border border-dashed border-white/10 rounded-xl">No eligible projects found.</div> : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredProjects.map(p => (
+                          <button key={p.id} onClick={() => {
+                              setProjectId(p.id);
+                              setBudget(p.budget);
+                          }} className="glass-card p-6 rounded-xl border border-white/5 hover:border-primary/50 transition-all text-left group">
+                              <h3 className="font-bold text-white text-lg group-hover:text-primary transition-colors">{p.title}</h3>
+                              <p className="text-gray-400 text-sm">₹{p.budget} • {p.status}</p>
+                          </button>
+                      ))}
+                  </div>
+               )
+              }
+          </div>
+      )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

@@ -6,6 +6,8 @@ import { encryptBuffer, generateFileHash } from '../utils/cryptoService.js';
 import { sendProjectInvite } from '../utils/emailService.js';
 import pool from '../config/db.js';
 import { createNotification } from '../models/notificationModel.js';
+import bcrypt from 'bcrypt';
+import { getMFASecret, clearMFASecret } from '../models/userModel.js';
 
 // 0. List Projects (For Dashboard)
 export const listProjects = async (req, res) => {
@@ -422,5 +424,96 @@ export const downloadCode = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Download Failed' });
+    }
+};
+
+// --- Advanced Lock Features ---
+
+export const requestLockModification = async (req, res) => {
+    try {
+        const { projectId, requestType } = req.body; // requestType: 'UNLOCK' or 'DELETE'
+        const developerId = req.user.id;
+
+        const project = await findProjectById(projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        
+        if (project.developer_id !== developerId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // Create Request
+        const query = `
+            INSERT INTO lock_requests (project_id, requester_id, request_type, status)
+            VALUES ($1, $2, $3, 'PENDING')
+            RETURNING *;
+        `;
+        await pool.query(query, [projectId, developerId, requestType]);
+
+        // Notify Client
+        await createNotification(project.client_id, `Lock Modification Requested: ${requestType} for "${project.title}". Please review.`);
+
+        res.json({ message: 'Request sent to client' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
+export const approveLockModification = async (req, res) => {
+    try {
+        const { requestId, otp } = req.body;
+        const clientId = req.user.id;
+
+        // 1. Verify OTP (MFA)
+        const secretData = await getMFASecret(clientId);
+        if (!secretData) return res.status(400).json({ error: 'MFA not set up or expired. Login again to set MFA.' });
+
+        const [hashedOtp, expiryStr] = secretData.split('|');
+        if (Date.now() > parseInt(expiryStr)) return res.status(400).json({ error: 'OTP Expired' });
+        
+        const isValid = await bcrypt.compare(otp, hashedOtp);
+        if (!isValid) return res.status(401).json({ error: 'Invalid OTP' });
+        
+        // 2. Clear OTP (One-time use)
+        await clearMFASecret(clientId);
+
+        // 3. Process Request
+        const reqQuery = `SELECT * FROM lock_requests WHERE id = $1`;
+        const reqResult = await pool.query(reqQuery, [requestId]);
+        const lockRequest = reqResult.rows[0];
+
+        if (!lockRequest) return res.status(404).json({ error: 'Request not found' });
+        if (lockRequest.status !== 'PENDING') return res.status(400).json({ error: 'Request already processed' });
+
+        // Update Request Status
+        await pool.query(`UPDATE lock_requests SET status = 'APPROVED' WHERE id = $1`, [requestId]);
+
+        // Perform Action
+        // UNLOCK/DELETE -> Revert to IN_PROGRESS
+        await updateProjectStatus(lockRequest.project_id, 'IN_PROGRESS');
+        
+        // Optional: If 'DELETE', maybe delete versions? 
+        // For 'UNLOCK', we just allow overwrite. Let's keep it simple: Status -> IN_PROGRESS allows uploadCode again.
+        
+        // Notify Developer
+        const project = await findProjectById(lockRequest.project_id);
+        await createNotification(lockRequest.requester_id, `Lock Modification APPROVED for "${project.title}". You can now update the lock.`);
+
+        res.json({ message: 'Request Approved & Project Unlocked' });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Approval Failed' });
+    }
+};
+
+export const getProjectLockRequests = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = `SELECT * FROM lock_requests WHERE project_id = $1 ORDER BY created_at DESC`;
+        const result = await pool.query(query, [id]);
+        res.json(result.rows);
+    } catch(e) {
+        res.status(500).json({ error: 'Failed to fetch requests' });
     }
 };
