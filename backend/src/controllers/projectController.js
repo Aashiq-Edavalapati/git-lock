@@ -19,6 +19,7 @@ export const listProjects = async (req, res) => {
       SELECT 
         p.*, 
         c.full_name as client_name, 
+        c.email as client_email,
         d.full_name as developer_name
       FROM projects p
       LEFT JOIN users c ON p.client_id = c.id
@@ -84,7 +85,8 @@ export const initProject = async (req, res) => {
 
     // A. Validation: If dev email is provided, check if they are a real user?    
     // B. Create Project
-    const newProject = await createProject(title, description, budget, clientId, developerEmail || null);
+    const status = developerEmail ? 'INVITE_SENT' : 'OPEN';
+    const newProject = await createProject(title, description, budget, clientId, developerEmail || null, status);
 
     // C. Handle Invite Logic
     if (developerEmail) {
@@ -108,7 +110,7 @@ export const initProject = async (req, res) => {
 // 1.5 Send Invite (Late Invitation)
 export const inviteDeveloper = async (req, res) => {
   try {
-    const { projectId, developerEmail } = req.body;
+    const { projectId, developerEmail, subject, body } = req.body;
     const clientId = req.user.id;
 
     // A. Authorization Check (Rubric #2: Access Control)
@@ -127,7 +129,7 @@ export const inviteDeveloper = async (req, res) => {
 
     // C. Send Email
     // We need client email. In a real app, fetch it. Here assuming req.user has it.
-    await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget);
+    await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
 
     await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`);
     
@@ -142,6 +144,63 @@ export const inviteDeveloper = async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Failed to send invite' });
   }
+};
+
+// 1.6 Remove Developer / Cancel Invite
+export const removeDeveloper = async (req, res) => {
+    try {
+        const { projectId } = req.body;
+        const clientId = req.user.id;
+
+        const project = await findProjectById(projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        if (project.client_id !== clientId) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        // Prevent removal if Payment is Completed (Status: COMPLETED)
+        if (project.status === 'COMPLETED') {
+             return res.status(400).json({ error: 'Cannot remove developer after project completion/payment.' });
+        }
+
+        const oldDevEmail = project.developer_email;
+        const oldStatus = project.status;
+
+        // Reset to OPEN
+        // We also need to clear developer_id if it was set
+        const query = `UPDATE projects SET developer_email = NULL, developer_id = NULL, status = 'OPEN' WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, [projectId]);
+
+        // Notifications
+        await createNotification(clientId, `Developer removed from "${project.title}". Project is now Open.`);
+        
+        // If developer was already assigned/invited, notify them
+        if (oldDevEmail) {
+            // Try to find if they are a registered user to send in-app notification
+            const devUser = await findUserByEmail(oldDevEmail);
+            if (devUser) {
+                 await createNotification(devUser.id, `You have been removed from project "${project.title}" by the client.`);
+            }
+
+            // Send Email Notification (Crucial for active projects)
+            if (oldStatus === 'IN_PROGRESS' || oldStatus === 'LOCKED_REVIEW') {
+                 // Import dynamically to avoid circular issues if any, or just use import
+                 const { sendNotificationEmail } = await import('../utils/emailService.js');
+                 await sendNotificationEmail(
+                    oldDevEmail, 
+                    `Project Update: ${project.title}`,
+                    `Hello,\n\nThe client has removed you from the project "${project.title}".\n\nIf you believe this is a mistake, please contact the client directly.\n\n- GitLock Team`
+                 );
+            }
+        }
+
+        res.json({ message: 'Developer removed successfully', project: result.rows[0] });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to remove developer' });
+    }
 };
 
 // Dev accepting the invite from client

@@ -28,12 +28,15 @@ export const sendMFAEmail = async (email, code) => {
   }
 };
 
-export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget) => {
+export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget, subject, body) => {
+  const defaultSubject = `New Project Invite: ${projectTitle}`;
+  const defaultBody = `Hello,\n\n${clientName} has invited you to work on "${projectTitle}" with a budget of $${budget}.\n\nPlease log in to GitLock to accept or reject this project.\n\n- The GitLock Team`;
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: devEmail,
-    subject: `New Project Invite: ${projectTitle}`,
-    text: `Hello,\n\n${clientName} has invited you to work on "${projectTitle}" with a budget of $${budget}.\n\nPlease log in to GitLock to accept or reject this project.\n\n- The GitLock Team`
+    subject: subject || defaultSubject,
+    text: body || defaultBody
   };
 
   try {

@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests, removeDeveloper } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -18,6 +18,7 @@ router.post('/create', authenticateToken, requireRole('CLIENT'), initProject);
 
 // Client invites developer later
 router.post('/invite', authenticateToken, requireRole('CLIENT'), inviteDeveloper);
+router.post('/cancel-invite', authenticateToken, requireRole('CLIENT'), removeDeveloper);
 
 // Developer accepts invite
 router.post('/accept', authenticateToken, requireRole('DEVELOPER'), acceptProject);

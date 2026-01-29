@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, PlusCircle, 
-  Settings, LogOut, FileCode, Menu, Bell 
+  Settings, LogOut, FileCode, Menu, Bell, Mail 
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
+  { icon: Mail, label: "Invitations", href: "/dashboard/invitations" },
   { icon: PlusCircle, label: "New Lock", href: "/dashboard/create" },
   { icon: FileCode, label: "My Contracts", href: "/dashboard/contracts" },
   { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
