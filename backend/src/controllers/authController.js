@@ -13,17 +13,16 @@ export const register = async (req, res) => {
   try {
     const { email, fullName, password, role } = req.body;
 
-    // 1. Check if user exists
+    // Check if user exists
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // 2. Hash the password (Rubric #4: Hashing with Salt)
-    // Intuition: We wait for the hash to compute. Higher salt rounds = slower but safer.
+    // Hash the password (Rubric #4: Hashing with Salt)
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // 3. Create User
+    // Create User
     const newUser = await createUser(email, fullName, passwordHash, role, null);
 
     res.status(201).json({ 
@@ -41,20 +40,20 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // 1. Basic Validation
+    // Basic Validation
     const user = await findUserByEmail(email);
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // 2. Generate secure 6-digit OTP
+    // Generate secure 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
     
-    // 3. Hash the OTP (Security Best Practice)
+    // Hash the OTP (Security Best Practice)
     const otpHash = await bcrypt.hash(otp, 10);
     const expiry = Date.now() + 10 * 60 * 1000; // 10 Minutes from now
 
-    // 4. Save to DB and Send Email
+    // Save to DB and Send Email
     await saveMFASecret(user.id, otpHash, expiry);
     
     // Note: In a real app, don't log the OTP! We do it here just for testing if email fails.
@@ -62,7 +61,7 @@ export const login = async (req, res) => {
     
     await sendMFAEmail(email, otp);
 
-    // 5. Respond WITHOUT Token
+    // Respond WITHOUT Token
     res.status(200).json({ 
       message: 'MFA Code sent to email', 
       userId: user.id,
@@ -79,40 +78,37 @@ export const verifyMFA = async (req, res) => {
   try {
     const { userId, otp } = req.body;
 
-    // 1. Fetch the stored secret
+    // Fetch the stored secret
     const secretData = await getMFASecret(userId);
     if (!secretData) return res.status(400).json({ error: 'MFA session expired or invalid' });
 
     const [hashedOtp, expiryStr] = secretData.split('|');
 
-    // 2. Check Expiry
+    // Check Expiry
     if (Date.now() > parseInt(expiryStr)) {
       return res.status(400).json({ error: 'OTP Expired' });
     }
 
-    // 3. Verify OTP
+    // Verify OTP
     const isValid = await bcrypt.compare(otp, hashedOtp);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid OTP' });
     }
 
-    // 4. Valid! Clear the secret so it can't be reused (Replay Attack Prevention)
     await clearMFASecret(userId);
 
-    // 5. Issue JWT Token (HttpOnly Cookie)
-    // We also fetch user details again to ensure role is correct
-    // (In a full app, you might want to fetch the user object here)
+    // Issue JWT Token (HttpOnly Cookie)
     const user = await findUserById(userId);
-    const token = generateToken(user); // Passed full user object
+    const token = generateToken(user); 
 
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in prod
+      secure: process.env.NODE_ENV === 'production', 
       sameSite: 'strict',
-      maxAge: 3600000 // 1 hour
+      maxAge: 60 * 60 * 24 * 30 // 30 days
     });
 
-    res.status(200).json({ message: 'Login Complete', token }); // Sending token in body too for ease of testing
+    res.status(200).json({ message: 'Login Complete' });
 
   } catch (error) {
     console.error(error);
@@ -147,35 +143,28 @@ export const githubLogin = async (req, res) => {
     const { code, role } = req.body; // Frontend sends the code and selected role
     if (!code) return res.status(400).json({ error: 'No code provided' });
 
-    // 1. Exchange Code for Token
+    // Exchange Code for Token
     const accessToken = await getGithubToken(code);
     if (!accessToken) return res.status(401).json({ error: 'GitHub Auth Failed' });
 
-    // 2. Get User Profile
+    // Get User Profile
     const githubProfile = await getGithubUser(accessToken);
     
-    // 3. Find or Create User in DB
-    // Logic: Check if user exists by email OR github_id. 
-    // If not, insert them. 
-    // CRITICAL: We MUST store the accessToken to fetch their private repos later.
-    
-    // (Simplified DB logic for brevity - assume findOrCreateUser function exists)
-    let user = await findUserByEmail(githubProfile.email); // You might need to handle null email from GitHub
+    // Find or Create User in DB
+    let user = await findUserByEmail(githubProfile.email);
     
     if (!user) {
-       // Create new user (Generate a random password hash since they won't use it)
-       // Use provided role or default to DEVELOPER if invalid
+       // Create new user
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
-       // Extract avatar (GitHub uses 'avatar_url')
        const avatarUrl = githubProfile.avatar_url;
        user = await createUser(githubProfile.email, githubProfile.name, 'oauth_placeholder', userRole, avatarUrl);
     }
 
-    // Update their Github Token in DB (We need this for the GitLock Verification step!)
+    // Update their Github Token in DB
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2, avatar_url=$3 WHERE id = $4', 
       [accessToken, githubProfile.id, githubProfile.avatar_url, user.id]);
 
-    // 4. Issue JWT
+    // Issue JWT
     const token = generateToken(user);
     res.cookie('token', token, { httpOnly: true });
     res.json({ token, user });
@@ -191,22 +180,20 @@ export const googleLogin = async (req, res) => {
     const { code, role } = req.body;
     if (!code) return res.status(400).json({ error: 'No code provided' });
 
-    // 1. Exchange Code for Token
+    // Exchange Code for Token
     const tokenData = await getGoogleToken(code);
     const accessToken = tokenData.access_token;
-    const idToken = tokenData.id_token; // Contains user info
+    const idToken = tokenData.id_token;
 
-    // 2. Get User Profile (Using ID Token or Access Token)
-    // Google OAuth usually gives user info in the ID Token or via UserInfo endpoint
+    // Get User Profile
     const googleProfile = await getGoogleUser(accessToken);
     
-    // 3. Find or Create User in DB
+    // Find or Create User in DB
     let user = await findUserByEmail(googleProfile.email);
     
     if (!user) {
-       // Create new user (Generate a random password hash since they won't use it)
+       // Create new user
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
-       // Extract avatar (Google uses 'picture')
        const avatarUrl = googleProfile.picture;
        user = await createUser(googleProfile.email, googleProfile.name, 'oauth_placeholder', userRole, avatarUrl);
     }
@@ -215,7 +202,7 @@ export const googleLogin = async (req, res) => {
     await pool.query('UPDATE users SET google_access_token = $1, google_id = $2, avatar_url=$3 WHERE id = $4', 
       [accessToken, googleProfile.id, googleProfile.picture, user.id]);
 
-    // 4. Issue JWT
+    // Issue JWT
     const token = generateToken(user);
     res.cookie('token', token, { httpOnly: true });
     res.json({ token, user });
@@ -233,7 +220,7 @@ export const logout = (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { fullName, bio } = req.body;
-    const { updateUserProfile } = await import('../models/userModel.js'); // Lazy import to avoid circular dependency issues if any
+    const { updateUserProfile } = await import('../models/userModel.js');
     
     const updatedUser = await updateUserProfile(req.user.id, fullName, bio);
     res.json({ message: 'Profile updated', user: updatedUser });
@@ -257,7 +244,6 @@ export const initiateDeleteAccount = async (req, res) => {
 
     await saveMFASecret(userId, otpHash, expiry);
     
-    // In real app, send email. For now, log it clearly.
     console.log(`[SECURE DELETE] OTP for ${email}: ${otp}`);
     await sendMFAEmail(email, otp);
 
@@ -288,7 +274,6 @@ export const deleteAccount = async (req, res) => {
       return res.status(401).json({ error: 'Invalid OTP' });
     }
 
-    // Proceed with deletion
     const { deleteUser } = await import('../models/userModel.js');
     await deleteUser(userId);
     
@@ -306,14 +291,10 @@ export const connectGithubAccount = async (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ error: 'No code provided' });
 
-    // 1. Exchange Code
     const accessToken = await getGithubToken(code);
     if (!accessToken) return res.status(401).json({ error: 'GitHub Auth Failed' });
 
-    // 2. Get Profile
     const githubProfile = await getGithubUser(accessToken);
-
-    // 3. Link to Current User (req.user.id from middleware)
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
       [accessToken, githubProfile.id, req.user.id]);
 

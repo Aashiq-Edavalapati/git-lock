@@ -242,27 +242,24 @@ export default function EscrowPage({ params }) {
                     <p className="text-gray-400 text-sm">Payment of ₹{project.budget} required to decrypt source code.</p>
                     
                     {/* Rubric #5: Encoding/Decoding Visual Proof (Encrypted State) */}
-                    {project.version?.readme_preview && (
+                    {project.version?.readme_preview ? (
                         <div className="text-left bg-black/40 p-3 rounded border border-white/5">
-                            <div className="text-xs text-primary mb-1">Encrypted Preview (Base64) - Visual Proof</div>
-                            <div className="text-[10px] text-gray-500 font-mono break-all line-clamp-3">
+                            <div className="text-xs text-primary mb-1">README.md Preview (Base64 Encoded)</div>
+                            <div className="text-[10px] text-gray-500 font-mono break-all line-clamp-4 overflow-hidden text-ellipsis">
                                 {project.version.readme_preview}
                             </div>
                         </div>
+                    ) : (
+                        <div className="text-sm text-gray-500 italic">No README preview available</div>
                     )}
                     
-                    <div className="bg-black/40 p-4 rounded-xl space-y-2 border border-green-500/20">
-                        <div className="flex items-center justify-between text-green-400">
-                            <div className="flex items-center gap-3"><FileCode size={16}/> source_code.zip (Decrypted)</div>
-                            <Button 
-                                onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank')}
-                                size="sm" 
-                                className="h-8 bg-green-600 hover:bg-green-700 text-white"
-                            >
-                                Download
-                            </Button>
+                    <div className="bg-black/40 p-4 rounded-xl space-y-2 border border-green-500/20 opacity-50">
+                        <div className="flex items-center justify-between text-gray-400">
+                            <div className="flex items-center gap-3"><FileCode size={16}/> source_code.zip (Encrypted)</div>
+                             {/* No Download Button for Client until paid */}
                         </div>
                     </div>
+
                     {/* Only Client sees Pay Button */}
                     {!isDev && (
                         <Button onClick={() => { setIsPaymentProcessing(true); handlePayment(); }} className="w-full h-12" disabled={isPaymentProcessing}>
@@ -280,10 +277,24 @@ export default function EscrowPage({ params }) {
               <div className="flex justify-between text-sm"><span className="text-gray-400">Budget</span><span className="text-white">₹{project.budget}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-400">Status</span><span className="text-white">{project.status}</span></div>
               <hr className="border-white/10"/>
-              {project.version && (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-green-400 text-xs"><ShieldCheck size={14}/> Verified Commit</div>
-                    <div className="text-[10px] text-gray-500 font-mono">Hash: {project.version.zip_hash.substring(0, 10)}...</div>
+               {project.version && (
+                <div className="space-y-4">
+                     <div className="space-y-1">
+                        <h5 className="text-[10px] text-gray-500 uppercase font-bold">Verification</h5>
+                        <div className="text-[10px] text-gray-400 truncate">Commit: <span className="font-mono text-white">{project.version.commit_sha?.substring(0, 7)}</span></div>
+                        <div className="text-[10px] text-gray-400 truncate">Hash: <span className="font-mono text-white">{project.version.zip_hash?.substring(0, 10)}...</span></div>
+                     </div>
+
+                     {project.version.staging_url && (
+                         <div className="space-y-1">
+                            <h5 className="text-[10px] text-gray-500 uppercase font-bold">Deployment</h5>
+                            <a href={project.version.staging_url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline break-all">
+                                {project.version.staging_url}
+                            </a>
+                         </div>
+                     )}
+                     
+                     <div className="flex items-center gap-2 text-green-400 text-xs mt-2"><ShieldCheck size={14}/> Verified & Locked</div>
                 </div>
               )}
           </div>

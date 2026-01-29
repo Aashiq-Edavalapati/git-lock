@@ -198,10 +198,7 @@ export const uploadCode = async (req, res) => {
         return res.status(400).json({ error: 'Repository Owner and Name are required.' });
     }
     
-    // Clean commitSha just in case
-    // const [_, owner, repoName] = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/); // REMOVED
-    
-    // 1. Get Developer's GitHub Token from DB
+    // Get Developer's GitHub Token from DB
     // We need this to access Private Repos
     const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
     const devResult = await pool.query(devQuery, [req.user.id]);
@@ -209,19 +206,11 @@ export const uploadCode = async (req, res) => {
 
     if (!githubToken) return res.status(403).json({ error: 'Please connect GitHub account first' });
 
-    // 2. Fetch the "Official" Code from GitHub
+    // Fetch the "Official" Code from GitHub
     console.log(`🕵️ Verifying Integrity with GitHub for commit ${commitSha}...`);
     const githubZipBuffer = await fetchGithubZip(repoOwner, repoName, commitSha, githubToken);
     
-    // 3. Compare Hashes (The "GitLock" Core Logic)
-    // Note: GitHub zips might differ slightly in metadata/folder structure compared to a local zip.
-    // OPTION A (Strict): Hash the buffers. (Hard because compression varies)
-    // OPTION B (Smart): Unzip both in memory, hash the *contents* (files).
-    // FOR THIS LAB: We will assume the user downloads the zip FROM GitHub and uploads THAT exact file.
-    // This allows exact hash matching.
-    
-    // 3. Compare Contents (Smart Verification)
-    // We compare file entries and their CRC32 checksums to ignore compression differences
+    // Compare Hashes (The "GitLock" Core Logic)
     const githubZip = new AdmZip(githubZipBuffer);
     const uploadedZip = new AdmZip(req.file.buffer);
 
@@ -250,10 +239,6 @@ export const uploadCode = async (req, res) => {
     for (let i = 0; i < githubEntries.length; i++) {
         const gh = githubEntries[i];
         const up = uploadedEntries[i];
-
-        // We only check if names match approximately (handling the root folder difference dynamically is hard, usually stripping root works)
-        // If the user zipped it without a root folder, standardizing paths is key.
-        // For now, we trust the name sort + CRC.
         
         if (gh.crc !== up.crc) {
              return res.status(400).json({ error: `Content Mismatch: File '${gh.name}' differs from GitHub version.` });
@@ -262,17 +247,14 @@ export const uploadCode = async (req, res) => {
 
     console.log("✅ Integrity Verified: Code matches GitHub exactly.");
 
-    // 4. Verify Deployment Status
+    // Verify Deployment Status
     console.log("🌍 Verifying Staging Deployment...");
     await verifyDeploymentStatus(repoOwner, repoName, commitSha, githubToken, stagingUrl);
     console.log("✅ Deployment Verified.");
 
-    // 5. Proceed with Encryption (Existing Logic)
+    // Proceed with Encryption (Existing Logic)
     const encryptedData = encryptBuffer(req.file.buffer);
     
-    // Use uploadedEntries CRC or similar as hash? 
-    // We already verified they match. We can store the simple hash or the calculated content hash.
-    // For now, keep using the uploaded file's simple hash as the identifier.
     const finalHash = generateFileHash(req.file.buffer);
 
     const readmeEntry = githubZip.getEntries().find(e => e.entryName.toLowerCase().endsWith('readme.md'));
@@ -355,9 +337,20 @@ export const downloadCode = async (req, res) => {
         
         if (!project) return res.status(404).json({ error: 'Project not found' });
         
-        // Access Control: Only Client or Developer or if Unlocked
-        if (project.status !== 'COMPLETED' && req.user.id !== project.client_id && req.user.id !== project.developer_id) {
-             return res.status(403).json({ error: 'Access Denied: Project is locked.' });
+        // Access Control Logic
+        // 1. Developer: Can download anytime (as they are the uploader)
+        if (req.user.id === project.developer_id) {
+             // Access Granted
+        } 
+        // 2. Client: Can ONLY download if status is COMPLETED
+        else if (req.user.id === project.client_id) {
+             if (project.status !== 'COMPLETED') {
+                 return res.status(403).json({ error: 'Access Denied: Payment not completed yet.' });
+             }
+        }
+        // 3. Others: Strict No
+        else {
+             return res.status(403).json({ error: 'Access Denied' });
         }
 
         // Get Version

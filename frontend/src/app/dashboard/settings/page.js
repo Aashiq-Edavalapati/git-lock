@@ -7,6 +7,7 @@ import {
   LogOut, Save, CheckCircle2, AlertCircle 
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import DeleteConfirmationModal from "@/components/dashboard/DeleteConfirmationModal";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
