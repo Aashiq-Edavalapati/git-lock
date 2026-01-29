@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  LayoutDashboard, PlusCircle, ShieldCheck, 
-  Settings, LogOut, FileCode, Menu 
+  LayoutDashboard, PlusCircle, 
+  Settings, LogOut, FileCode, Menu, Bell 
 } from "lucide-react";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
   { icon: PlusCircle, label: "New Lock", href: "/dashboard/create" },
   { icon: FileCode, label: "My Contracts", href: "/dashboard/contracts" },
+  { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 

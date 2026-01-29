@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import pool from '../config/db.js';
 import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
+import { createNotification } from '../models/notificationModel.js';
 import { sendMFAEmail } from '../utils/emailService.js';
 import { generateToken } from '../utils/jwtService.js';
 
@@ -297,6 +298,8 @@ export const connectGithubAccount = async (req, res) => {
     const githubProfile = await getGithubUser(accessToken);
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
       [accessToken, githubProfile.id, req.user.id]);
+
+    await createNotification(req.user.id, `GitHub Account ${githubProfile.login || 'Unknown'} connected successfully.`);
 
     res.json({ message: 'Github account connected successfully', user: githubProfile });
 

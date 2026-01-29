@@ -5,6 +5,7 @@ import { findUserByEmail, findUserById } from '../models/userModel.js';
 import { encryptBuffer, generateFileHash } from '../utils/cryptoService.js';
 import { sendProjectInvite } from '../utils/emailService.js';
 import pool from '../config/db.js';
+import { createNotification } from '../models/notificationModel.js';
 
 // 0. List Projects (For Dashboard)
 export const listProjects = async (req, res) => {
@@ -88,6 +89,9 @@ export const initProject = async (req, res) => {
       await sendProjectInvite(developerEmail, clientEmail, title, budget);
     }
 
+    // D. Notification
+    await createNotification(clientId, `Project Created: ${title}`);
+
     res.status(201).json({
       message: developerEmail ? 'Project created and invite sent' : 'Project created (No developer invited yet)',
       project: newProject
@@ -123,6 +127,13 @@ export const inviteDeveloper = async (req, res) => {
     // We need client email. In a real app, fetch it. Here assuming req.user has it.
     await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget);
 
+    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`);
+    
+    const developer = await findUserByEmail(developerEmail);
+    if (developer) {
+        await createNotification(developer.id, `You received an invitation for project "${project.title}"`);
+    }
+
     res.status(200).json({ message: 'Invite sent successfully', project: result.rows[0] });
 
   } catch (error) {
@@ -138,16 +149,16 @@ export const acceptProject = async (req, res) => {
     const developerId = req.user.id;
     const developerEmail = req.user.email;
 
-    // 1. Check Project
+    // Check Project
     const project = await findProjectById(projectId);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    // 2. Access Control: Is this the invited email?
+    // Access Control: Is this the invited email?
     if (project.developer_email !== developerEmail) {
       return res.status(403).json({ error: 'Unauthorized: You were not invited to this project' });
     }
 
-    // 3. Update Status and Bind Developer ID
+    // Update Status and Bind Developer ID
     const query = `
       UPDATE projects 
       SET developer_id = $1, status = 'IN_PROGRESS' 
@@ -155,6 +166,10 @@ export const acceptProject = async (req, res) => {
       RETURNING *
     `;
     const result = await pool.query(query, [developerId, projectId]);
+
+    // Notifications
+    await createNotification(project.client_id, `Developer ${developerEmail} accepted your invite for "${project.title}"`);
+    await createNotification(developerId, `You successfully joined project "${project.title}"`);
 
     res.status(200).json({ message: 'Project accepted!', project: result.rows[0] });
 
@@ -262,6 +277,19 @@ export const uploadCode = async (req, res) => {
     await updateProjectStatus(projectId, 'LOCKED_REVIEW');
 
     res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
+    
+    // Notification Logic
+    const project = await findProjectById(projectId);
+    const notificationMsg = `
+      New Code Locked for "${project.title}".
+      - Deploy Status: Verified (Success)
+      - Staging URL: ${cleanProvidedUrl || stagingUrl}
+      - GitHub Commit: ${commitSha} (Verified)
+      - Integrity Check: Passed (Matches GitHub Source)
+    `.trim();
+
+    await createNotification(project.client_id, notificationMsg);
+    await createNotification(project.developer_id, `Code uploaded successfully for "${project.title}". Validation passed.`);
 
   } catch (error) {
     console.error(error);

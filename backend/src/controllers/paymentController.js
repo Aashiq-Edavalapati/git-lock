@@ -1,8 +1,10 @@
 import crypto from 'crypto';
 import razorpay from '../config/razorpay.js';
 import pool from '../config/db.js';
+import { createNotification } from '../models/notificationModel.js';
+import { findProjectById } from '../models/projectModel.js';
 
-// 1. Create Payment Order
+// Create Payment Order
 export const createOrder = async (req, res) => {
   try {
     const { amount, currency = 'INR' } = req.body;
@@ -82,6 +84,13 @@ export const verifyAndUnlock = async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Notifications
+    const project = await findProjectById(projectId);
+    if(project) {
+        await createNotification(project.client_id, `Payment Successful. Project "${project.title}" Unlocked.`);
+        await createNotification(project.developer_id, `Payment Secured in Escrow for "${project.title}". Code Released.`);
+    }
 
     res.status(200).json({ success: true, message: "Payment Verified & Project Unlocked" });
 
