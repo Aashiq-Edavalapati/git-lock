@@ -1,13 +1,13 @@
 import axios from 'axios';
 import AdmZip from 'adm-zip';
-import { createProject, findProjectById, saveProjectVersion, updateProjectStatus } from '../models/projectModel.js';
-import { findUserByEmail, findUserById } from '../models/userModel.js';
+import { createProject, findProjectById, saveProjectVersion, updateProjectStatus, createProject as createProjectModel, updateProject as updateProjectModel, deleteProject as deleteProjectModel } from '../models/projectModel.js';
+import { findUserByEmail, findUserById, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { encryptBuffer, generateFileHash } from '../utils/cryptoService.js';
-import { sendProjectInvite } from '../utils/emailService.js';
+import { sendProjectInvite, sendNotificationEmail } from '../utils/emailService.js';
+import { generateOTP, storeMFASecret } from '../utils/mfaService.js';
 import pool from '../config/db.js';
 import { createNotification } from '../models/notificationModel.js';
 import bcrypt from 'bcrypt';
-import { getMFASecret, clearMFASecret } from '../models/userModel.js';
 
 // 0. List Projects (For Dashboard)
 export const listProjects = async (req, res) => {
@@ -578,52 +578,163 @@ export const getProjectLockRequests = async (req, res) => {
 };
 
 // --- Edit / Delete Project ---
+// --- Refined Edit Workflow ---
 
-import { updateProject as updateProjectModel, deleteProject as deleteProjectModel } from '../models/projectModel.js';
-import { sendNotificationEmail } from '../utils/emailService.js';
-
-export const editProject = async (req, res) => {
+export const updateSafeDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, budget } = req.body;
-        const clientId = req.user.id; // Authenticated user
+        const { title, description } = req.body;
+        const clientId = req.user.id;
 
         const project = await findProjectById(id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.client_id !== clientId) return res.status(403).json({ error: 'Unauthorized' });
 
-        if (project.client_id !== clientId) {
-            return res.status(403).json({ error: 'Unauthorized: You are not the owner.' });
+        // Update only Title and Description
+        await pool.query('UPDATE projects SET title = $1, description = $2 WHERE id = $3', [title, description, id]);
+        
+        // Notify Developer
+        if (project.developer_id) {
+             createNotification(project.developer_id, `Project details updated: "${title}"`);
         }
 
-        // Update
-        const updatedProject = await updateProjectModel(id, title, description, budget);
+        res.json({ message: 'Project details updated' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
 
-        // Notify Developer if exists
-        // Notification Logic
-        if (project.developer_id || project.developer_email) {
-            const devEmail = project.developer_email;
-            
-            // In-App
-             // Try to find if they are a registered user to send in-app notification
-             const devUser = await findUserByEmail(devEmail);
-             if (devUser) {
-                 await createNotification(devUser.id, `Project Updated: Details for "${project.title}" have been changed by the client.`);
-             }
+export const requestBudgetUpdate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { newBudget } = req.body;
+        const clientId = req.user.id;
 
-            // Email
-            await sendNotificationEmail(
-                devEmail,
-                `Project Update: ${updatedProject.title}`,
-                `Hello,\n\nThe client has updated the details for the project "${project.title}".\n\nNew Title: ${updatedProject.title}\nNew Budget: ${updatedProject.budget}\n\nPlease check the dashboard for more details.\n\n- GitLock Team`
+        // No OTP check for Client Request anymore (Moved to Dev Approval)
+
+        const project = await findProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.client_id !== clientId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // Set Pending Budget
+        await pool.query('UPDATE projects SET pending_budget = $1 WHERE id = $2', [newBudget, id]);
+
+        // Notify Developer (Action Required)
+        if (project.developer_id) {
+            await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`);
+             // Email
+            const devUser = await findUserById(project.developer_id);
+             await sendNotificationEmail(
+                devUser.email, 
+                `Budget Change Request: ${project.title}`,
+                `The client wants to change the budget to ₹${newBudget}.\n\nPlease go to the dashboard to Approve or Reject this change.`
             );
         }
 
-        res.json({ message: 'Project Updated Successfully', project: updatedProject });
+        res.json({ message: 'Budget update requested. Waiting for developer approval.' });
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to update project' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to request budget update' });
     }
+};
+
+export const sendBudgetApprovalOTP = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const developerId = req.user.id;
+
+        const project = await findProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.developer_id !== developerId) return res.status(403).json({ error: 'Unauthorized' });
+        
+        const devUser = await findUserById(developerId);
+        
+        // Generate and Send OTP
+        const otp = generateOTP();
+        const hashedOtp = await bcrypt.hash(otp, 10);
+        const expiry = Date.now() + 10 * 60 * 1000; // 10 mins
+        
+        await storeMFASecret(developerId, `${hashedOtp}|${expiry}`);
+        
+        await sendNotificationEmail(
+            devUser.email,
+            `Budget Approval OTP: ${project.title}`,
+            `Your OTP to approve the budget update is: ${otp}\n\nThis OTP is valid for 10 minutes.`
+        );
+
+        res.json({ message: 'OTP sent to your email.' });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to send OTP' });
+    }
+};
+
+export const approveBudgetUpdate = async (req, res) => {
+     try {
+        const { id } = req.params;
+        const { otp } = req.body;
+        const developerId = req.user.id;
+
+        const project = await findProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.developer_id !== developerId) return res.status(403).json({ error: 'Unauthorized' });
+
+        if (!project.pending_budget) return res.status(400).json({ error: 'No pending budget request' });
+
+        // Verify OTP
+        const secretData = await getMFASecret(developerId);
+        if (!secretData) return res.status(400).json({ error: 'OTP expired or not requested.' });
+        const [hashedOtp, expiryStr] = secretData.split('|');
+        if (Date.now() > parseInt(expiryStr)) return res.status(400).json({ error: 'OTP Expired' });
+        const isValid = await bcrypt.compare(otp, hashedOtp);
+        if (!isValid) return res.status(401).json({ error: 'Invalid OTP' });
+        await clearMFASecret(developerId);
+
+        const newBudget = project.pending_budget;
+
+        // Apply Change
+        await pool.query('UPDATE projects SET budget = $1, pending_budget = NULL WHERE id = $2', [newBudget, id]);
+
+        // Notify Client
+        await createNotification(project.client_id, `Budget Approved! New budget for "${project.title}" is ₹${newBudget}.`);
+        
+        res.json({ message: 'Budget updated successfully' });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
+export const rejectBudgetUpdate = async (req, res) => {
+     try {
+        const { id } = req.params;
+        const developerId = req.user.id;
+
+        const project = await findProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.developer_id !== developerId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // Reject Change
+        await pool.query('UPDATE projects SET pending_budget = NULL WHERE id = $1', [id]);
+
+        // Notify Client
+        await createNotification(project.client_id, `Budget Change Rejected for "${project.title}".`);
+        
+        res.json({ message: 'Budget update rejected' });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed' });
+    }
+};
+
+export const editProject = async (req, res) => {
+    // Deprecated in favor of updateSafeDetails + requestBudgetUpdate, but kept for Fallback
+    res.status(410).json({ error: 'Please use the new safe update endpoints.' });
 };
 
 export const deleteProject = async (req, res) => {
@@ -639,18 +750,13 @@ export const deleteProject = async (req, res) => {
         }
         
         // Prevent deletion if payment/escrow is active? 
-        // Logic: If status is LOCKED_REVIEW or COMPLETED, maybe prevent delete or warn?
-        // User asked for "Delete", assuming full delete capability.
-        // Usually good to prevent if work is submitted (LOCKED_REVIEW) to protect developer.
-        
-        if (project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') {
-             // For now, allow but verify this is okay. 
-             // Ideally we shouldn't allow deleting a project with active escrow without resolving it.
-             // But for this feature request, we will proceed with delete but notify strongly.
-             // Actually, safety check: if funds are locked, deleting project might lose record of funds.
-             // Let's allow it but maybe we should have implemented a check. 
-             // Proceeding as requested: "Option to delete...". 
+        // SAFETY CHECK: Block deletion if project is COMPLETED (Funds Transferred / Work Done) gives history protection
+        if (project.status === 'COMPLETED') {
+             return res.status(403).json({ error: 'Cannot delete a completed project. It serves as a transaction record.' });
         }
+
+        // Logic: If status is LOCKED_REVIEW, maybe warn?
+        
 
         // Notify Developer BEFORE deleting (so we have their email)
         if (project.developer_email) {

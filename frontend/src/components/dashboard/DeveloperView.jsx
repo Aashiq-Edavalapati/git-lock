@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ShieldCheck, Lock, Unlock, Plus } from "lucide-react";
+import { ShieldCheck, Lock, Unlock, Plus, Code2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import api from "@/lib/api";
 import Notifications from "./Notifications";
@@ -36,10 +36,12 @@ export default function DeveloperView() {
         {projects.map((project) => (
           <div key={project.id} className="glass-card p-6 rounded-xl flex items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center text-white"><ShieldCheck /></div>
+              <div className="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500"><Code2 /></div>
               <div>
-                <h3 className="font-bold text-white">{project.title}</h3>
-                <p className="text-sm text-gray-400">₹{project.budget}</p>
+                <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
+                  <h3 className="font-bold text-white hover:text-blue-400 transition-colors">{project.title}</h3>
+                </Link>
+                <p className="text-sm text-gray-400">Status: <span className="text-white">{project.status}</span></p>
               </div>
             </div>
 

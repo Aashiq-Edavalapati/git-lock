@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests, removeDeveloper, editProject, deleteProject } from '../controllers/projectController.js';
+import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests, removeDeveloper, editProject, deleteProject, updateSafeDetails, requestBudgetUpdate, approveBudgetUpdate, rejectBudgetUpdate, sendBudgetApprovalOTP } from '../controllers/projectController.js';
 import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -13,6 +13,11 @@ const upload = multer({ storage: storage });
 router.get('/', authenticateToken, listProjects);
 router.get('/:id', authenticateToken, getProject);
 router.put('/:id', authenticateToken, requireRole('CLIENT'), editProject);
+router.put('/:id/safe', authenticateToken, requireRole('CLIENT'), updateSafeDetails);
+router.post('/:id/budget-request', authenticateToken, requireRole('CLIENT'), requestBudgetUpdate);
+router.post('/:id/budget-approve-otp', authenticateToken, requireRole('DEVELOPER'), sendBudgetApprovalOTP);
+router.post('/:id/budget-approve', authenticateToken, requireRole('DEVELOPER'), approveBudgetUpdate);
+router.post('/:id/budget-reject', authenticateToken, requireRole('DEVELOPER'), rejectBudgetUpdate);
 router.delete('/:id', authenticateToken, requireRole('CLIENT'), deleteProject);
 
 // Client creates project

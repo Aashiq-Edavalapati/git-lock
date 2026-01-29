@@ -8,7 +8,6 @@ import api from "@/lib/api";
 import Notifications from "./Notifications";
 
 import InviteDevModal from "./InviteDevModal";
-import EditProjectModal from "./EditProjectModal";
 import ConfirmationModal from "./ConfirmationModal";
 
 export default function ClientView() {
@@ -21,10 +20,6 @@ export default function ClientView() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [defaultInviteEmail, setDefaultInviteEmail] = useState("");
-
-  // Edit Modal State
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [projectToEdit, setProjectToEdit] = useState(null);
 
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -77,22 +72,6 @@ export default function ClientView() {
     }
   };
 
-  const openEditModal = (project) => {
-    setProjectToEdit(project);
-    setShowEditModal(true);
-  };
-
-  const handleEditSuccess = (updatedProject) => {
-    const idx = projects.findIndex(p => p.id === updatedProject.id);
-    if (idx > -1) {
-      const newProjects = [...projects];
-      newProjects[idx] = updatedProject;
-      setProjects(newProjects);
-    }
-    // Or just refresh
-    refreshProjects();
-  };
-
   const confirmDelete = (project) => {
     setProjectToDelete(project);
     setShowDeleteModal(true);
@@ -136,7 +115,6 @@ export default function ClientView() {
               key={p.id}
               project={p}
               onOpenInvite={openInviteModal}
-              onEdit={() => openEditModal(p)}
               onDelete={() => confirmDelete(p)}
             />
           ))
@@ -168,14 +146,6 @@ export default function ClientView() {
         defaultEmail={defaultInviteEmail}
       />
 
-      {/* Edit Modal */}
-      <EditProjectModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        project={projectToEdit}
-        onSuccess={handleEditSuccess}
-      />
-
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={showDeleteModal}
@@ -199,9 +169,9 @@ function ProjectCard({ project, onOpenInvite, onEdit, onDelete }) {
 
       {/* Actions: Absolute positioned or just flex at end? Let's assume standard layout */}
       <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white" title="Edit Project">
+        <Link href={`/dashboard/projects/${project.id}`} className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white" title="Edit Project">
           <Edit size={14} />
-        </button>
+        </Link>
         <button onClick={onDelete} className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-full text-red-500 hover:text-red-400" title="Delete Project">
           <Trash2 size={14} />
         </button>
@@ -210,7 +180,9 @@ function ProjectCard({ project, onOpenInvite, onEdit, onDelete }) {
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center text-primary"><FileCode /></div>
         <div>
-          <h3 className="font-bold text-white">{project.title}</h3>
+          <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
+            <h3 className="font-bold text-white hover:text-primary transition-colors">{project.title}</h3>
+          </Link>
           <p className="text-sm text-gray-400">₹{project.budget} • {project.status}</p>
         </div>
       </div>
