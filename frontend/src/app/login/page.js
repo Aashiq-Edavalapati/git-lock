@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Github, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
 import api from "@/lib/api"; 
+import { useSearchParams } from "next/navigation";
 
 // 1. Get these from Environment Variables (Instructions below)
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -11,6 +12,15 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000";
 
 export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>}>
+            <LoginForm />
+        </Suspense>
+    )
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({ email: "", password: "", otp: "" });
   const [role, setRole] = useState("CLIENT"); // Default role
   const [error, setError] = useState("");
@@ -122,6 +132,14 @@ export default function LoginPage() {
                       </div>
                       
                       <RoleSelector role={role} setRole={setRole} />
+
+                       {/* Message from Middleware */}
+                       {searchParams.get("message") && (
+                           <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg flex items-center gap-2 text-sm text-blue-400 mb-4">
+                               <AlertCircle size={16} />
+                               {searchParams.get("message")}
+                           </div>
+                       )}
 
                       {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
                       <Button className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying...' : 'Secure Login'}</Button>
