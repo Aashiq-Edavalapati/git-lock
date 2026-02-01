@@ -5,6 +5,7 @@ import pool from './src/config/db.js';
 import authRoutes from './src/routes/authRoutes.js';
 import projectRoutes from './src/routes/projectRoutes.js';
 import paymentRoutes from './src/routes/paymentRoutes.js';
+import payoutRoutes from './src/routes/payoutRoutes.js';
 import githubRoutes from './src/routes/githubRoutes.js';
 import cookieParser from 'cookie-parser';
 
@@ -21,6 +22,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payouts', payoutRoutes);
 app.use('/api/github', githubRoutes);
 
 app.get('/', (req, res) => {

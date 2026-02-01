@@ -3,12 +3,46 @@ import razorpay from '../config/razorpay.js';
 import pool from '../config/db.js';
 import { createNotification } from '../models/notificationModel.js';
 import { findProjectById } from '../models/projectModel.js';
+import { findUserById } from '../models/userModel.js';
+import { hasValidPayoutMethod } from '../models/payoutModel.js';
+import { sendNotificationEmail } from '../utils/emailService.js';
 
 // Create Payment Order
 export const createOrder = async (req, res) => {
   try {
-    const { amount, currency = 'INR' } = req.body;
+    const { amount, currency = 'INR', projectId } = req.body;
     
+    // Validate Developer Payout Method
+    if (projectId) {
+        const project = await findProjectById(projectId);
+        if (project && project.developer_id) {
+            const hasPayout = await hasValidPayoutMethod(project.developer_id);
+            if (!hasPayout) {
+                // NOTIFICATION LOGIC
+                // 1. In-App Notification
+                await createNotification(
+                    project.developer_id, 
+                    `Action Required: Client attempted to pay for "${project.title}" but failed because you haven't set a Payout Method. Please Configure it in Settings.`
+                );
+
+                // 2. Email Notification
+                const dev = await findUserById(project.developer_id);
+                if (dev) {
+                    await sendNotificationEmail(
+                        dev.email,
+                        "Action Required: Payment Blocked",
+                        `Hello ${dev.full_name},\n\nThe client for project "${project.title}" attempted to release the payment, but the transaction was blocked because you have not set up a valid Payout Method.\n\nPlease go to your Settings > Payout Method and add a UPI ID or Bank Account immediately to receive funds.\n\n- GitLock Team`
+                    );
+                }
+
+                return res.status(400).json({ 
+                    error: "Developer has not set up a payout method. Payment cannot be processed.",
+                    code: "NO_PAYOUT_METHOD"
+                });
+            }
+        }
+    }
+
     // Ensure amount is handled as integer (paise)
     const amountInPaise = Math.round(parseFloat(amount) * 100);
     console.log(`Making Razorpay Order: ₹${amount} -> ${amountInPaise} paise`);

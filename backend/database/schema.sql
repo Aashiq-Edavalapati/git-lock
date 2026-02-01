@@ -1,3 +1,6 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
 CREATE TABLE public.audit_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -71,5 +74,6 @@ CREATE TABLE public.users (
   avatar_url text,
   google_access_token text,
   bio text,
+  payout_methods jsonb DEFAULT '[]'::jsonb,
   CONSTRAINT users_pkey PRIMARY KEY (id)
 );
