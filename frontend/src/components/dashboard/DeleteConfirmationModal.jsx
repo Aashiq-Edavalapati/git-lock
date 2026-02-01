@@ -21,7 +21,7 @@ export default function DeleteConfirmationModal({ onClose }) {
      setLoading(true);
      setError("");
      try {
-         await api.post('/auth/delete/initiate');
+         await api.post('/auth/delete-account/initiate');
          setStep(2);
      } catch (err) {
          setError("Failed to send OTP. Try again.");
@@ -34,7 +34,7 @@ export default function DeleteConfirmationModal({ onClose }) {
      setLoading(true);
      setError("");
      try {
-         await api.delete('/auth/me', { data: { otp } }); // Delete requests with body need 'data' key in axios
+         await api.delete('/auth/delete-account', { data: { otp } }); // Delete requests with body need 'data' key in axios
          router.push('/login');
      } catch (err) {
          setError(err.response?.data?.error || "Deletion Failed");

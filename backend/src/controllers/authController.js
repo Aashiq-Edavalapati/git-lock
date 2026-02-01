@@ -4,7 +4,7 @@ import pool from '../config/db.js';
 import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
 import { createNotification } from '../models/notificationModel.js';
-import { sendMFAEmail } from '../utils/emailService.js';
+import { sendMFAEmail, sendWelcomeEmail } from '../utils/emailService.js';
 import { generateToken } from '../utils/jwtService.js';
 
 // Standard recommended salt rounds for bcrypt is 10-12
@@ -26,6 +26,9 @@ export const register = async (req, res) => {
     // Create User
     const newUser = await createUser(email, fullName, passwordHash, role, null);
 
+    // Send Welcome Email
+    await sendWelcomeEmail(email, fullName);
+
     res.status(201).json({ 
       message: 'User registered successfully', 
       user: newUser 
@@ -43,7 +46,10 @@ export const login = async (req, res) => {
     
     // Basic Validation
     const user = await findUserByEmail(email);
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    if (!user) {
+      return res.status(401).json({ error: 'User not found! Please Register before loggin in' });
+    }
+    if (!(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -58,7 +64,7 @@ export const login = async (req, res) => {
     await saveMFASecret(user.id, otpHash, expiry);
     
     // Note: In a real app, don't log the OTP! We do it here just for testing if email fails.
-    console.log(`DEBUG ONLY: Generated OTP for ${email}: ${otp}`); 
+    // console.log(`DEBUG ONLY: Generated OTP for ${email}: ${otp}`); 
     
     await sendMFAEmail(email, otp);
 
@@ -159,6 +165,9 @@ export const githubLogin = async (req, res) => {
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
        const avatarUrl = githubProfile.avatar_url;
        user = await createUser(githubProfile.email, githubProfile.name, 'oauth_placeholder', userRole, avatarUrl);
+       
+       // Send Welcome Email
+       await sendWelcomeEmail(user.email, githubProfile.name);
     }
 
     // Update their Github Token in DB
@@ -202,6 +211,9 @@ export const googleLogin = async (req, res) => {
        const userRole = (role === 'CLIENT' || role === 'DEVELOPER') ? role : 'DEVELOPER';
        const avatarUrl = googleProfile.picture;
        user = await createUser(googleProfile.email, googleProfile.name, 'oauth_placeholder', userRole, avatarUrl);
+       
+       // Send Welcome Email
+       await sendWelcomeEmail(user.email, googleProfile.name);
     }
 
     // Update their Google Token in DB
@@ -225,6 +237,7 @@ export const googleLogin = async (req, res) => {
     res.status(500).json({ error: 'Google Login Error' });
   }
 };
+
 export const logout = (req, res) => {
   res.clearCookie('token');
   res.status(200).json({ message: 'Logged out successfully' });

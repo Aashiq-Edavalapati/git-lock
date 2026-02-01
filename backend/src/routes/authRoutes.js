@@ -18,5 +18,7 @@ router.put('/profile', authenticateToken, updateProfile);
 // MFA & Sensitive Actions
 router.post('/request-otp', authenticateToken, requestOTP);
 router.post('/delete-account/initiate', authenticateToken, initiateDeleteAccount);
+router.delete('/delete-account', authenticateToken, deleteAccount);
+router.post('/verify-mfa', verifyMFA);
 
 export default router;

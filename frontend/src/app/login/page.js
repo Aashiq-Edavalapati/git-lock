@@ -5,6 +5,7 @@ import { Github, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
 import api from "@/lib/api"; 
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 // 1. Get these from Environment Variables (Instructions below)
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -153,12 +154,19 @@ function LoginForm() {
                           <SocialLoginButton icon={Github} text="Github" onClick={() => handleSocialLogin('github')} />
                           <SocialLoginButton icon={Mail} text="Google" onClick={() => handleSocialLogin('google')} /> 
                       </div>
+
+                       <p className="text-center text-gray-400 text-sm">
+                            Don&apos;t have an account?{" "}
+                            <Link href="/register" className="text-primary hover:underline font-medium">
+                                Register now
+                            </Link>
+                        </p>
                    </form>
                ) : (
                    <form onSubmit={handleVerifyMfa} className="space-y-4">
                         {/* MFA Form kept same... */}
                         <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center">
-                            <p className="text-sm text-primary mb-2">Check the Backend Console for OTP</p>
+                            <p className="text-sm text-primary mb-2">Check your mail for OTP</p>
                         </div>
                         <div>
                          <label className="text-gray-400 text-sm mb-1 block">Enter 6-Digit OTP</label>
@@ -169,7 +177,7 @@ function LoginForm() {
                          />
                       </div>
                       {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
-                      <Button className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying OTP...' : 'Verify Identity'}</Button>
+                      <Button onClick={handleVerifyMfa} className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying OTP...' : 'Verify Identity'}</Button>
                    </form>
                )}
             </div>
