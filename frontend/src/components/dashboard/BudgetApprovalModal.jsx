@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { Loader2, DollarSign, Lock, Mail } from "lucide-react";

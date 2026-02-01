@@ -5,6 +5,8 @@ import api from "@/lib/api";
 import { ShieldCheck, Download, Lock, AlertTriangle, RefreshCw } from "lucide-react";
 import Button from "@/components/ui/Button";
 import LockRequestModal from "@/components/dashboard/LockRequestModal";
+import SuccessModal from "@/components/dashboard/SuccessModal";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 
 export default function EscrowPage({ params }) {
   const { id } = use(params);
@@ -19,6 +21,10 @@ export default function EscrowPage({ params }) {
   const [pendingRequest, setPendingRequest] = useState(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+  
+  // Modals
+  const [successModal, setSuccessModal] = useState({ open: false, title: "", message: "" });
+  const [errorModal, setErrorModal] = useState({ open: false, title: "", message: "" });
 
   // Helper to get Razorpay
   const loadRazorpay = () => {
@@ -71,9 +77,9 @@ export default function EscrowPage({ params }) {
     try {
         await api.post('/projects/accept', { projectId: project.id });
         fetchProjectData(); // Refresh state
-        alert("Project Accepted!");
+        setSuccessModal({ open: true, title: "Project Accepted", message: "You have successfully accepted the project." });
     } catch (err) {
-        alert("Failed to accept: " + (err.response?.data?.error || err.message));
+        setErrorModal({ open: true, title: "Acceptance Failed", message: err.response?.data?.error || err.message });
     } finally {
         setIsAccepting(false);
     }
@@ -86,7 +92,7 @@ export default function EscrowPage({ params }) {
           await api.post('/projects/lock-request', { projectId: project.id, requestType: 'UNLOCK' });
           fetchProjectData(); // Refresh to see pending state
       } catch(e) {
-          alert("Failed to request unlock");
+          setErrorModal({ open: true, title: "Request Failed", message: "Failed to submit unlock request." });
       } finally {
           setIsRequesting(false);
       }
@@ -143,7 +149,10 @@ export default function EscrowPage({ params }) {
   // --- STATE 3: LOCKED / COMPLETED (Vault View) ---
   const handlePayment = async () => {
     const res = await loadRazorpay();
-    if (!res) { alert('Razorpay SDK failed to load'); return; }
+    if (!res) { 
+        setErrorModal({ open: true, title: "Payment Error", message: "Razorpay SDK failed to load. Check your connection." });
+        return; 
+    }
 
     try {
         // 1. Create Order
@@ -178,18 +187,25 @@ export default function EscrowPage({ params }) {
                         projectId: project.id
                     });
 
-                    alert("Payment Successful! Code Unlocked.");
+                    setSuccessModal({ 
+                        open: true, 
+                        title: "Payment Successful", 
+                        message: "The budget has been released and the code is now unlocked!",
+                        onAction: () => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank'),
+                        actionLabel: "Download Code"
+                    });
+                    
                     fetchProjectData(); // Refresh UI to show UNLOCKED state
 
                     // 2. Trigger Download (Optional auto-download)
                     // We can redirect/open new tab for download or fetch blob
-                    window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank');
+                    // window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank'); // Moving this to manual action in modal
 
                 } catch (verifyErr) {
                      console.error("Unlock Error:", verifyErr);
                     const errMsg = verifyErr.response?.data?.error || verifyErr.message || "Unknown Error";
                     const status = verifyErr.response?.status || "No Status";
-                    alert(`Verification Failed! \nStatus: ${status} \nError: ${errMsg}`);
+                    setErrorModal({ open: true, title: "Verification Failed", message: `Payment succeeded but unlock failed.\nStatus: ${status}\nError: ${errMsg}` });
                 }
             },
             prefill: {
@@ -212,13 +228,17 @@ export default function EscrowPage({ params }) {
         const rzp1 = new window.Razorpay(options);
         rzp1.on('payment.failed', function (response){
                 console.error("❌ Payment Failed Event:", response.error);
-                alert(`Payment Failed: ${response.error.description} \nReason: ${response.error.reason} \nSource: ${response.error.source}`);
+                setErrorModal({ 
+                    open: true, 
+                    title: "Payment Failed", 
+                    message: `${response.error.description}\nReason: ${response.error.reason}`
+                });
         });
         rzp1.open();
 
     } catch (err) {
         console.error(err);
-        alert("Payment Intiaiization Failed");
+        setErrorModal({ open: true, title: "Error", message: "Payment Initialization Failed" });
         setIsPaymentProcessing(false);
     }
   };
@@ -378,6 +398,22 @@ export default function EscrowPage({ params }) {
             }}
           />
       )}
+
+      {/* Global Modals */}
+      <SuccessModal 
+        isOpen={successModal.open}
+        onClose={() => setSuccessModal(prev => ({ ...prev, open: false }))}
+        title={successModal.title}
+        message={successModal.message}
+        onAction={successModal.onAction}
+        actionLabel={successModal.actionLabel}
+      />
+      <ErrorModal
+        isOpen={errorModal.open}
+        onClose={() => setErrorModal(prev => ({ ...prev, open: false }))}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 }

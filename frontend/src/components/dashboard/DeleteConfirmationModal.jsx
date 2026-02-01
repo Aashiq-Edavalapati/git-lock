@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";

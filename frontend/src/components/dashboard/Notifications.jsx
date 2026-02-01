@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import api from "@/lib/api";

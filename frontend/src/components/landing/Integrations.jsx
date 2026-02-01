@@ -1,3 +1,5 @@
+"use client";
+
 export default function Integrations() {
     return (
         <section className="w-full border-y border-white/5 bg-white/[0.01] py-12 mb-32 overflow-hidden">

@@ -1,3 +1,5 @@
+"use client";
+
 import { ShieldCheck, Lock, Zap, Globe } from "lucide-react";
 
 export default function Features() {

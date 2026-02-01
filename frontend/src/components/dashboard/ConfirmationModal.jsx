@@ -1,3 +1,5 @@
+"use client";
+
 import Button from "@/components/ui/Button";
 import { Loader2, AlertTriangle } from "lucide-react";
 

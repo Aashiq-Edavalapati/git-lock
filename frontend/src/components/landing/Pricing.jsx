@@ -1,3 +1,5 @@
+"use client";
+
 import Button from "@/components/ui/Button";
 import { CheckCircle2 } from "lucide-react";
 
