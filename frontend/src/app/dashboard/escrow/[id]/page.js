@@ -156,7 +156,11 @@ export default function EscrowPage({ params }) {
 
     try {
         // 1. Create Order
-        const orderRes = await api.post('/payments/create-order', { amount: project.budget, currency: 'INR' });
+        const orderRes = await api.post('/payments/create-order', { 
+            amount: project.budget, 
+            currency: 'INR',
+            projectId: project.id 
+        });
         const order = orderRes.data;
 
         // 2. Get Key and Open Razorpay
@@ -165,13 +169,11 @@ export default function EscrowPage({ params }) {
 
         const options = {
             key: key, 
-            // amount: order.amount, // Rely on order_id
-            // currency: order.currency, // Rely on order_id
             name: "GitLock Escrow",
             description: `Unlock Code for ${project.title}`,
             order_id: order.id,
             notes: {
-                projectId: project.id, // Metadata
+                projectId: project.id, 
             },
             handler: async function (response) {
                 console.log("💳 Razorpay Payment Success!", response); 
@@ -195,11 +197,7 @@ export default function EscrowPage({ params }) {
                         actionLabel: "Download Code"
                     });
                     
-                    fetchProjectData(); // Refresh UI to show UNLOCKED state
-
-                    // 2. Trigger Download (Optional auto-download)
-                    // We can redirect/open new tab for download or fetch blob
-                    // window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank'); // Moving this to manual action in modal
+                    fetchProjectData(); 
 
                 } catch (verifyErr) {
                      console.error("Unlock Error:", verifyErr);
@@ -214,7 +212,6 @@ export default function EscrowPage({ params }) {
                 contact: "9999999999", 
             },
             theme: { color: "#3399cc" },
-            // retry: { enabled: false }, // Re-enabled default retry
             modal: {
                 ondismiss: function() {
                     console.log('Checkout form closed');
@@ -223,7 +220,7 @@ export default function EscrowPage({ params }) {
             }
         };
 
-        console.log("🚀 Initializing Razorpay with Options:", options); // DEBUG LOG
+        console.log("🚀 Initializing Razorpay with Options:", options); 
         
         const rzp1 = new window.Razorpay(options);
         rzp1.on('payment.failed', function (response){
@@ -238,7 +235,14 @@ export default function EscrowPage({ params }) {
 
     } catch (err) {
         console.error(err);
-        setErrorModal({ open: true, title: "Error", message: "Payment Initialization Failed" });
+        const errorData = err.response?.data || {};
+        const isPayoutError = errorData.code === 'NO_PAYOUT_METHOD';
+        
+        setErrorModal({ 
+            open: true, 
+            title: isPayoutError ? "Payment Blocked" : "Error", 
+            message: errorData.error || "Payment Initialization Failed" 
+        });
         setIsPaymentProcessing(false);
     }
   };
