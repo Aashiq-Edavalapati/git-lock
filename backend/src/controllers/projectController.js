@@ -240,6 +240,58 @@ export const acceptProject = async (req, res) => {
   }
 };
 
+// Developer Revoking Acceptance
+export const revokeProjectAcceptance = async (req, res) => {
+    try {
+        const { id } = req.params; // Project ID
+        const developerId = req.user.id;
+
+        const project = await findProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        // Authorization: Must be the assigned developer
+        if (project.developer_id !== developerId) {
+            return res.status(403).json({ error: 'Unauthorized: You are not the assigned developer for this project.' });
+        }
+
+        // Validation: Cannot revoke if COMPLETED 
+        // (Optional: Maybe restrict if LOCKED_REVIEW too? User said "revoke his acceptance", usually implies early stage, but let's allow as long as not completed/paid)
+        if (project.status === 'COMPLETED') {
+            return res.status(400).json({ error: 'Cannot revoke acceptance for a completed project.' });
+        }
+
+        // Action: Reset Developer fields
+        // We set status to OPEN so client can invite someone else or it appears in marketplace
+        const query = `
+            UPDATE projects 
+            SET developer_id = NULL, developer_email = NULL, status = 'OPEN' 
+            WHERE id = $1 
+            RETURNING *
+        `;
+        const result = await pool.query(query, [id]);
+
+        // Notifications
+        // 1. In-App to Client
+        await createNotification(project.client_id, `URGENT: Developer has revoked acceptance for "${project.title}". Project is now OPEN.`);
+        
+        // 2. Email to Client
+        const clientUser = await findUserById(project.client_id);
+        if (clientUser) {
+            await sendNotificationEmail(
+                clientUser.email,
+                `Project Alert: Developer Revoked Acceptance - ${project.title}`,
+                `Hello,\n\nThe developer has revoked their acceptance for the project "${project.title}".\n\nThe project status has been reset to OPEN. You can now invite a new developer or wait for applications.\n\n- GitLock Team`
+            );
+        }
+
+        res.json({ message: 'You have revoked your acceptance. Project removed from your list.', project: result.rows[0] });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to revoke revocation' });
+    }
+};
+
 const fetchGithubZip = async (repoOwner, repoName, commitSha, token) => {
   const url = `https://api.github.com/repos/${repoOwner}/${repoName}/zipball/${commitSha}`;
   const response = await axios({
@@ -395,7 +447,8 @@ const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl
 
   // Compare using the cleaned URL
   if (actualUrl && !actualUrl.includes(cleanProvidedUrl)) {
-    console.warn("⚠️ Warning: CI Deployment URL differs from Staging URL.");
+    // throw new Error(`Deployment URL mismatch. Expected starting with: ${cleanProvidedUrl}, Found: ${actualUrl}`);
+    throw new Error(`Deployment URL mismatch. Please enter the correct deployment URL.`);
   }
 
   return actualUrl;
@@ -405,6 +458,11 @@ export const verifyProjectDetails = async (req, res) => {
     try {
         const { repoOwner, repoName, commitSha, stagingUrl } = req.body;
         
+        // Basic Validation
+        if (!/^[0-9a-f]{40}$/.test(commitSha)) {
+             return res.status(400).json({ error: 'Invalid Commit SHA. Must be 40 hexadecimal characters.' });
+        }
+
         // Get Token
         const devQuery = `SELECT github_access_token FROM users WHERE id = $1`;
         const devResult = await pool.query(devQuery, [req.user.id]);

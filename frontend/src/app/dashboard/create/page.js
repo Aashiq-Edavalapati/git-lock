@@ -4,6 +4,7 @@ import { useState, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Github, Upload, Lock, ArrowRight, CheckCircle2, FileArchive, Loader2, AlertTriangle, Check } from "lucide-react";
 import Button from "@/components/ui/Button";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 import api from "@/lib/api";
 
 // Helper constants
@@ -35,6 +36,7 @@ function CreateLockForm() {
   const [commitSha, setcommitSha] = useState("");
   const [stagingUrl, setStagingUrl] = useState("");
   const [repoStatus, setRepoStatus] = useState("idle"); // idle, loading, success, error
+  const [verificationError, setVerificationError] = useState(""); // Store specific error message
   
   // Repo Selection State
   const [showRepoModal, setShowRepoModal] = useState(false);
@@ -42,6 +44,9 @@ function CreateLockForm() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [needsGithubConnection, setNeedsGithubConnection] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Error Modal State
+  const [errorModal, setErrorModal] = useState({ open: false, title: "", message: "", action: null, actionLabel: "" });
 
   // Project Selection State (if no projectId)
   const [availableProjects, setAvailableProjects] = useState([]);
@@ -96,12 +101,31 @@ function CreateLockForm() {
       setRepoOwner(owner);
       setRepoName(name);
       setShowRepoModal(false);
+      // Reset status on new repo selection
+      setRepoStatus("idle");
+  };
+
+  const handleInputEdit = (setter) => (e) => {
+      setter(e.target.value);
+      if (repoStatus === 'success' || repoStatus === 'error') {
+          setRepoStatus('idle');
+          setVerificationError("");
+      }
   };
 
   const handleVerifyGit = async () => {
     if(repoOwner && repoName && commitSha && stagingUrl) {
+         // Frontend Validation
+         if (!/^[0-9a-f]{40}$/.test(commitSha)) {
+            setVerificationError("Commit SHA must be exactly 40 hexadecimal characters.");
+            setRepoStatus("error");
+            return;
+         }
+
         setRepoStatus("loading");
         try {
+            setRepoStatus("loading");
+            setVerificationError(""); // Clear previous errors
             await api.post('/projects/verify-details', {
                 projectId, repoOwner, repoName, commitSha: commitSha, stagingUrl
             });
@@ -110,10 +134,13 @@ function CreateLockForm() {
         } catch (err) {
             setRepoStatus("error");
             console.error(err);
-            alert(`Verification Failed: ${err.response?.data?.error || "Unknown Error"}`);
+            const errMsg = err.response?.data?.error || "Unknown Error";
+            setVerificationError(errMsg);
+            // alert(`Verification Failed: ${errMsg}`); // Removed alert in favor of UI message
         }
     } else {
-        alert("Please fill all fields");
+        setVerificationError("Please fill all fields");
+        setRepoStatus("error");
     }
   };
 
@@ -135,8 +162,19 @@ function CreateLockForm() {
         router.push(`/dashboard/escrow/${projectId}`);
     } catch (err) {
         console.error(err);
-        alert("Upload Failed: " + (err.response?.data?.error || err.message));
         setIsProcessing(false);
+        const errorMsg = err.response?.data?.error || err.message;
+        
+        // Check for specific mismatch errors to offer "Go Back" action
+        const isMismatch = errorMsg.includes("Mismatch") || errorMsg.includes("Hash");
+        
+        setErrorModal({
+            open: true,
+            title: "Lock Creation Failed",
+            message: errorMsg,
+            actionLabel: isMismatch ? "Back to Upload" : null,
+            action: isMismatch ? () => { setErrorModal(prev => ({...prev, open: false})); setStep(2); } : null
+        });
     }
   };
 
@@ -241,22 +279,22 @@ function CreateLockForm() {
                                 </button>
                              </div>
                              <input type="text" placeholder="e.g. facebook" className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary/50" 
-                                value={repoOwner} onChange={e => setRepoOwner(e.target.value)} />
+                                value={repoOwner} onChange={handleInputEdit(setRepoOwner)} />
                         </div>
                         <div>
                              <label className="text-sm text-gray-400 block mb-2">Repository Name</label>
                              <input type="text" placeholder="e.g. react" className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary/50" 
-                                value={repoName} onChange={e => setRepoName(e.target.value)} />
+                                value={repoName} onChange={handleInputEdit(setRepoName)} />
                         </div>
                         <div className="col-span-2">
                              <label className="text-sm text-gray-400 block mb-2">Commit SHA (Full Hash)</label>
                              <input type="text" placeholder="e.g. 5237b7..." className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary/50" 
-                                value={commitSha} onChange={e => setcommitSha(e.target.value)} />
+                                value={commitSha} onChange={handleInputEdit(setcommitSha)} />
                         </div>
                         <div className="col-span-2">
                              <label className="text-sm text-gray-400 block mb-2">Staging URL</label>
                              <input type="text" placeholder="https://..." className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary/50" 
-                                value={stagingUrl} onChange={e => setStagingUrl(e.target.value)} />
+                                value={stagingUrl} onChange={handleInputEdit(setStagingUrl)} />
                         </div>
                      </div>
                  </div>
@@ -267,7 +305,15 @@ function CreateLockForm() {
                      </Button>
                      
                      {repoStatus === 'success' && <div className="text-green-400 text-sm font-medium flex items-center gap-2"><CheckCircle2 size={16}/> Verification Successful</div>}
-                     {repoStatus === 'error' && <div className="text-red-400 text-sm font-medium flex items-center gap-2"><AlertTriangle size={16}/> Verification Failed</div>}
+                     {repoStatus === 'error' && (
+                        <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-start gap-3 max-w-sm">
+                            <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
+                            <div className="text-sm text-red-300">
+                                <span className="font-bold block mb-1">Verification Failed</span>
+                                {verificationError}
+                            </div>
+                        </div>
+                     )}
                      
                      <Button onClick={() => setStep(2)} disabled={repoStatus!=='success'}>
                          Next Step <ArrowRight size={16} className="ml-2"/>
@@ -350,9 +396,22 @@ function CreateLockForm() {
                          "Generate Smart Lock"
                      )}
                  </Button>
+                 
+                 <button onClick={() => setStep(2)} className="text-gray-400 hover:text-white text-sm" disabled={isProcessing}>
+                     Go Back
+                 </button>
              </div>
          )}
       </div>
+      
+      <ErrorModal 
+         isOpen={errorModal.open} 
+         onClose={() => setErrorModal(prev => ({ ...prev, open: false }))}
+         title={errorModal.title}
+         message={errorModal.message}
+         actionLabel={errorModal.actionLabel}
+         onAction={errorModal.action}
+      />
     </div>
   );
 }

@@ -6,8 +6,6 @@ import { ArrowLeft, Edit, Trash2, ShieldCheck, User, Calendar, DollarSign, Lock,
 import Button from "@/components/ui/Button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import InfoGrid from "@/components/ui/InfoGrid";
-// import EditProjectModal from "@/components/dashboard/EditProjectModal"; // Removed
 import BudgetRequestModal from "@/components/dashboard/BudgetRequestModal";
 import BudgetApprovalModal from "@/components/dashboard/BudgetApprovalModal";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
@@ -32,6 +30,10 @@ export default function ProjectDetailsPage({ params }) {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
+    
+    // Revoke State
+    const [showRevokeModal, setShowRevokeModal] = useState(false);
+    const [isRevoking, setIsRevoking] = useState(false);
 
     const handleDelete = async () => {
         // Confirmation is handled by the Modal, so we proceed directly
@@ -43,6 +45,18 @@ export default function ProjectDetailsPage({ params }) {
             alert(err.response?.data?.error || "Failed to delete project");
             setIsDeleting(false); // Only reset if failed. If success, we redirect.
             setShowDeleteModal(false);
+        }
+    };
+
+    const handleRevoke = async () => {
+        setIsRevoking(true);
+        try {
+            await api.post(`/projects/${id}/revoke`);
+            router.push('/dashboard');
+        } catch (err) {
+            alert(err.response?.data?.error || "Failed to revoke acceptance");
+            setIsRevoking(false);
+            setShowRevokeModal(false);
         }
     };
 
@@ -164,6 +178,15 @@ export default function ProjectDetailsPage({ params }) {
                                 <Trash2 size={16} /> Delete
                             </Button>
                          </>
+                     )}
+
+                     {isAssignedDev && !isLocked && (
+                        <Button 
+                            onClick={() => setShowRevokeModal(true)} 
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 flex items-center gap-2"
+                        >
+                            <Trash2 size={16} /> Revoke Acceptance
+                        </Button>
                      )}
 
                      {isOwner && isEditing && (
@@ -343,6 +366,15 @@ export default function ProjectDetailsPage({ params }) {
                 title="Delete Project?"
                 message="Are you sure? This cannot be undone."
                 isLoading={isDeleting}
+            />
+
+            <ConfirmationModal
+                isOpen={showRevokeModal}
+                onClose={() => !isRevoking && setShowRevokeModal(false)}
+                onConfirm={handleRevoke}
+                title="Revoke Acceptance?"
+                message="Are you sure you want to leave this project? The client will be notified."
+                isLoading={isRevoking}
             />
 
             <InviteDevModal

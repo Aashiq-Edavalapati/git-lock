@@ -7,6 +7,26 @@ CREATE TABLE public.audit_logs (
   CONSTRAINT audit_logs_pkey PRIMARY KEY (id),
   CONSTRAINT audit_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.lock_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id uuid,
+  requester_id uuid,
+  request_type text NOT NULL,
+  status text DEFAULT 'PENDING'::text,
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT lock_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT lock_requests_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT lock_requests_requester_id_fkey FOREIGN KEY (requester_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.notifications (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  message text NOT NULL,
+  is_read boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT notifications_pkey PRIMARY KEY (id),
+  CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.project_versions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   project_id uuid,
@@ -29,8 +49,9 @@ CREATE TABLE public.projects (
   client_id uuid,
   developer_email character varying,
   developer_id uuid,
-  status character varying DEFAULT 'INVITE_SENT'::character varying CHECK (status::text = ANY (ARRAY['INVITE_SENT'::character varying, 'IN_PROGRESS'::character varying, 'LOCKED_REVIEW'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying, 'REJECTED'::character varying]::text[])),
+  status character varying DEFAULT 'INVITE_SENT'::character varying CHECK (status::text = ANY (ARRAY['OPEN'::character varying, 'INVITE_SENT'::character varying, 'IN_PROGRESS'::character varying, 'LOCKED_REVIEW'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying, 'REJECTED'::character varying]::text[])),
   created_at timestamp with time zone DEFAULT now(),
+  pending_budget numeric DEFAULT NULL::numeric,
   CONSTRAINT projects_pkey PRIMARY KEY (id),
   CONSTRAINT projects_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.users(id),
   CONSTRAINT projects_developer_id_fkey FOREIGN KEY (developer_id) REFERENCES public.users(id)

@@ -106,7 +106,7 @@ export const verifyMFA = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', 
       sameSite: 'strict',
-      maxAge: 60 * 60 * 24 * 30 // 30 days
+      maxAge: 60 * 60 * 24 * 30
     });
 
     res.status(200).json({ message: 'Login Complete' });
@@ -167,7 +167,12 @@ export const githubLogin = async (req, res) => {
 
     // Issue JWT
     const token = generateToken(user);
-    res.cookie('token', token, { httpOnly: true });
+    res.cookie('token', token, { 
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === 'production', 
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 30
+    });
     res.json({ token, user });
 
   } catch (error) {
@@ -205,7 +210,14 @@ export const googleLogin = async (req, res) => {
 
     // Issue JWT
     const token = generateToken(user);
-    res.cookie('token', token, { httpOnly: true });
+
+    res.cookie('token', token, { 
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === 'production', 
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 30
+    });
+
     res.json({ token, user });
 
   } catch (error) {
