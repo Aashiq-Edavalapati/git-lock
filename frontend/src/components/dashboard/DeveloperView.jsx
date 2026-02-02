@@ -11,8 +11,12 @@ export default function DeveloperView() {
   const [projects, setProjects] = useState([]);
 
   useEffect(() => {
-    api.get('/projects').then(res => setProjects(res.data)).catch(console.error);
+    refreshProjects();
   }, []);
+
+  const refreshProjects = () => {
+    api.get('/projects').then(res => setProjects(res.data)).catch(console.error);
+  };
 
   return (
     <div className="space-y-8">

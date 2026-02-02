@@ -9,6 +9,7 @@ import Notifications from "./Notifications";
 
 import InviteDevModal from "./InviteDevModal";
 import ConfirmationModal from "./ConfirmationModal";
+import CreateProjectModal from "./CreateProjectModal";
 
 export default function ClientView() {
   const [projects, setProjects] = useState([]);
@@ -34,18 +35,13 @@ export default function ClientView() {
     api.get('/projects').then(res => setProjects(res.data)).catch(console.error);
   };
 
-  const handleCreate = async () => {
-    if (!newProject.title || !newProject.budget) return;
-    setIsCreating(true);
+  const handleCreate = async (projectData) => {
     try {
-      await api.post('/projects/create', { title: newProject.title, description: "New Project", budget: newProject.budget });
+      await api.post('/projects/create', projectData);
       setShowModal(false);
-      setNewProject({ title: "", budget: "" });
       refreshProjects();
     } catch (err) {
       alert("Failed to create project");
-    } finally {
-      setIsCreating(false);
     }
   };
 
@@ -121,22 +117,12 @@ export default function ClientView() {
         }
       </div>
 
-      {/* New Project Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-[#111] p-6 rounded-xl w-full max-w-md border border-white/10">
-            <h2 className="text-xl font-bold text-white mb-4">Create Project</h2>
-            <input className="w-full bg-black border border-white/10 p-2 text-white mb-2 rounded" placeholder="Project Title" value={newProject.title} onChange={e => setNewProject({ ...newProject, title: e.target.value })} />
-            <input className="w-full bg-black border border-white/10 p-2 text-white mb-4 rounded" placeholder="Budget (₹)" value={newProject.budget} onChange={e => setNewProject({ ...newProject, budget: e.target.value })} />
-            <div className="flex gap-2">
-              <Button onClick={handleCreate} className="flex-1" disabled={isCreating}>
-                {isCreating ? <span className="flex items-center gap-2 justify-center"><Loader2 className="animate-spin" size={16} /> Creating...</span> : 'Create'}
-              </Button>
-              <button onClick={() => setShowModal(false)} className="text-gray-400" disabled={isCreating}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onCreate={handleCreate}
+      />
 
       {/* Invite Modal */}
       <InviteDevModal

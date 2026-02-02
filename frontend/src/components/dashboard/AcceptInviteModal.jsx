@@ -1,82 +1,118 @@
 "use client";
 
-import { CheckCircle, X, ShieldCheck, User, FolderOpen, Banknote } from "lucide-react";
+import { ShieldCheck, Download } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default function AcceptInviteModal({ isOpen, onClose, project, onConfirm }) {
-    const [isProcessing, setIsProcessing] = useState(false);
-
-    if (!isOpen || !project) return null;
-
-    const handleConfirm = async () => {
-        setIsProcessing(true);
-        await onConfirm();
-        setIsProcessing(false);
-    };
+export default function AcceptInviteModal({ project, isDev, isAccepting, handleAcceptProject }) {
+    const router = useRouter();
+    const handleCloseModal = () => {
+        router.push('/dashboard');
+    }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#111] border border-white/10 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
-
+        <div className="max-w-2xl mx-auto pt-10 pb-20">
+            <div className="glass-card p-8 rounded-2xl space-y-8">
+                
                 {/* Header */}
-                <div className="p-6 border-b border-white/5 bg-blue-500/5">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-blue-400">
-                            <ShieldCheck size={20} />
-                            <span className="text-sm font-semibold tracking-wider uppercase">Project Invitation</span>
-                        </div>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors"><X size={20} /></button>
+                <div className="text-center space-y-4">
+                    <div className="mx-auto w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center text-primary">
+                        <ShieldCheck size={32} />
                     </div>
-                    <h2 className="text-2xl font-bold text-white leading-tight">{project.title}</h2>
+                    <h1 className="text-3xl font-bold text-white">Project Invitation</h1>
+                    <p className="text-gray-400">You have been invited to work on <span className="text-white font-bold">{project.title}</span>.</p>
                 </div>
 
-                {/* content */}
-                <div className="p-6 space-y-6">
-
-                    {/* Description */}
-                    <div>
-                        <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2 flex items-center gap-2">
-                            <FolderOpen size={14} /> Description
-                        </h3>
-                        <p className="text-gray-300 text-sm leading-relaxed bg-white/5 p-3 rounded-lg border border-white/5">
-                            {project.description || "No description provided."}
-                        </p>
-                    </div>
-
-                    {/* Client Info */}
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2 flex items-center gap-2">
-                                <User size={14} /> Client
-                            </h3>
-                            <div className="text-white text-sm">
-                                <p className="font-medium">{project.client_name || "Unknown Client"}</p>
-                                <p className="text-gray-400 text-xs">{project.client_email}</p>
-                            </div>
-                        </div>
-
-                        {/* Budget */}
-                        <div className="flex-1">
-                            <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2 flex items-center gap-2">
-                                <Banknote size={14} /> Budget
-                            </h3>
-                            <div className="text-green-400 font-bold text-xl">
-                                ₹{project.budget}
-                            </div>
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-4">
+                        <h3 className="text-xs uppercase text-gray-500 font-bold">Client Details</h3>
+                        <div>
+                            <p className="text-white font-medium">{project.client_name || "Unknown Client"}</p>
+                            <p className="text-gray-400 text-sm">{project.client_email}</p>
                         </div>
                     </div>
-
+                    <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-4">
+                         <h3 className="text-xs uppercase text-gray-500 font-bold">Budget</h3>
+                         <p className="text-green-400 font-bold text-2xl">₹{project.budget}</p>
+                    </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-6 border-t border-white/5 bg-black/20 flex justify-end gap-3">
-                    <Button variant="outline" onClick={onClose} disabled={isProcessing}>
-                        Cancel
-                    </Button>
-                    <Button onClick={handleConfirm} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 min-w-[140px]">
-                        {isProcessing ? "Joining..." : "Acccept & Join"}
-                    </Button>
+                <hr className="border-white/5" />
+
+                {/* Description */}
+                <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-white">Project Description</h3>
+                    <div className="bg-black/40 p-4 rounded-xl border border-white/5 text-gray-300 text-sm leading-relaxed">
+                        {project.description || "No description provided."}
+                    </div>
+                </div>
+
+                {/* Requirements */}
+                {project.requirements && (
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-white">Technical Requirements</h3>
+                        <div className="bg-black/40 p-4 rounded-xl border border-white/5 text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
+                            {project.requirements}
+                        </div>
+                    </div>
+                )}
+
+                {/* Attachments */}
+                 {project.attachments && project.attachments.length > 0 && (
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-white">Attachments</h3>
+                         <div className="grid grid-cols-1 gap-2">
+                            {project.attachments.map((file, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-purple-500/10 flex items-center justify-center text-purple-400">
+                                            <Download size={16} />{/* Using Download as generic file icon */}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-white font-medium truncat max-w-[200px]">{file.name}</p>
+                                            <p className="text-xs text-gray-500">{file.size}</p>
+                                        </div>
+                                    </div>
+                                    {/* Mock Download */}
+                                    <button className="text-gray-500 hover:text-white" title="Download">
+                                        <Download size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-6">
+                    {isDev ? (
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <Button 
+                                onClick={handleAcceptProject} 
+                                disabled={isAccepting}
+                                className="w-full h-14 text-lg font-semibold bg-green-400 hover:bg-green-500 text-black transition-all duration-200 shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.98]"
+                            >
+                                {isAccepting ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="animate-spin h-4 w-4 border-2 border-black/30 border-t-black rounded-full" />
+                                        Joining...
+                                    </span>
+                                ) : 'Accept & Join Project'}
+                            </Button>
+                            
+                            <button 
+                                onClick={handleCloseModal}
+                                className="w-full sm:w-1/3 h-14 text-sm font-medium text-gray-400 hover:text-white transition-colors duration-200"
+                            >
+                                Decline Invitation
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="text-center text-yellow-500/90 text-sm bg-yellow-500/5 py-4 px-6 rounded-xl border border-yellow-500/10 backdrop-blur-sm">
+                            Waiting for developer response...
+                        </div>
+                    )}
                 </div>
 
             </div>

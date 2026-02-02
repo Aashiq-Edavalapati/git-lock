@@ -1,12 +1,12 @@
 import pool from '../config/db.js';
 
-export const createProject = async (title, description, budget, clientId, devEmail, status = 'OPEN') => {
+export const createProject = async (title, description, budget, clientId, devEmail, requirements, attachments = [], status = 'OPEN') => {
   const query = `
-    INSERT INTO projects (title, description, budget, client_id, developer_email, status)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO projects (title, description, budget, client_id, developer_email, requirements, attachments, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *;
   `;
-  const result = await pool.query(query, [title, description, budget, clientId, devEmail, status]);
+  const result = await pool.query(query, [title, description, budget, clientId, devEmail, requirements, JSON.stringify(attachments), status]);
   return result.rows[0];
 };
 

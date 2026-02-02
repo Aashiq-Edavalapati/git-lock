@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import LockRequestModal from "@/components/dashboard/LockRequestModal";
 import SuccessModal from "@/components/dashboard/SuccessModal";
 import ErrorModal from "@/components/dashboard/ErrorModal";
+import AcceptInviteModal from "@/components/dashboard/AcceptInviteModal";
 
 export default function EscrowPage({ params }) {
   const { id } = use(params);
@@ -101,26 +102,7 @@ export default function EscrowPage({ params }) {
   // --- STATE 1: INVITE SENT (Developer Viewing) ---
   if (project.status === 'INVITE_SENT') {
       return (
-        <div className="max-w-2xl mx-auto pt-20">
-            <div className="glass-card p-8 rounded-2xl text-center space-y-6">
-                <div className="mx-auto w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center text-primary">
-                    <ShieldCheck size={32} />
-                </div>
-                <h1 className="text-3xl font-bold text-white">Project Invitation</h1>
-                <p className="text-gray-400">You have been invited to work on <span className="text-white font-bold">{project.title}</span>.</p>
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-left space-y-2">
-                    <div className="flex justify-between text-sm"><span className="text-gray-400">Budget</span><span className="text-green-400 font-bold">₹{project.budget}</span></div>
-                    <div className="flex justify-between text-sm"><span className="text-gray-400">Client</span><span className="text-white">Yes</span></div>
-                </div>
-                {isDev ? (
-                    <Button onClick={handleAcceptProject} className="w-full h-12" disabled={isAccepting}>
-                        {isAccepting ? 'Accepting Project...' : 'Accept Project'}
-                    </Button>
-                ) : (
-                    <div className="text-yellow-500 text-sm bg-yellow-500/10 p-2 rounded">Waiting for developer response...</div>
-                )}
-            </div>
-        </div>
+        <AcceptInviteModal project={project} isDev={isDev} isAccepting={isAccepting} handleAcceptProject={handleAcceptProject} />
       )
   }
 

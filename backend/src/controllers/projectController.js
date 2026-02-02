@@ -69,6 +69,13 @@ export const getProject = async (req, res) => {
         }
     }
 
+    // Include Client Details (Name/Email) for UI
+    const clientUser = await findUserById(project.client_id);
+    if (clientUser) {
+        project.client_name = clientUser.full_name;
+        project.client_email = clientUser.email;
+    }
+
     res.json(project);
   } catch (error) {
     console.error(error);
@@ -79,14 +86,14 @@ export const getProject = async (req, res) => {
 // 1. Client Creates Project (Refined)
 export const initProject = async (req, res) => {
   try {
-    const { title, description, budget, developerEmail } = req.body;
+    const { title, description, budget, developerEmail, requirements, attachments } = req.body;
     const clientId = req.user.id; // From JWT
     const clientEmail = req.user.email; // From JWT payload
 
     // A. Validation: If dev email is provided, check if they are a real user?    
     // B. Create Project
     const status = developerEmail ? 'INVITE_SENT' : 'OPEN';
-    const newProject = await createProject(title, description, budget, clientId, developerEmail || null, status);
+    const newProject = await createProject(title, description, budget, clientId, developerEmail || null, requirements || "", attachments || [], status);
 
     // C. Handle Invite Logic
     if (developerEmail) {
