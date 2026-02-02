@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import OTPInput from "@/components/ui/OTPInput";
 import api from "@/lib/api";
 
 export default function LockRequestModal({ requestId, onClose, onSuccess }) {
@@ -56,13 +57,10 @@ export default function LockRequestModal({ requestId, onClose, onSuccess }) {
                     </Button>
                 ) : (
                     <div className="space-y-4">
-                        <input
-                            type="text"
-                            placeholder="Entet 6-digit OTP"
-                            className="w-full bg-black/50 border border-white/10 rounded p-3 text-center text-white tracking-widest text-lg outline-none focus:border-primary"
+                        <OTPInput
+                            length={6}
                             value={otp}
-                            onChange={e => setOtp(e.target.value)}
-                            maxLength={6}
+                            onChange={setOtp}
                         />
                         <Button onClick={verifyOtp} className="w-full" disabled={loading || otp.length !== 6}>
                             {loading ? <Loader2 className="animate-spin" /> : "Verify & Approve"}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import OTPInput from "@/components/ui/OTPInput";
 import { Loader2, DollarSign, Lock, Mail } from "lucide-react";
 import api from "@/lib/api";
 
@@ -69,13 +70,11 @@ export default function BudgetApprovalModal({ isOpen, onClose, projectId, curren
 
                 {step === 2 && (
                     <div className="mb-4">
-                        <label className="text-xs text-gray-500 uppercase font-bold">Email OTP</label>
-                        <input
-                            type="text"
-                            className="w-full bg-black border border-white/10 p-2 text-white rounded mt-1 tracking-widest text-center"
-                            placeholder="Enter 6-digit code"
+                        <label className="text-xs text-gray-500 uppercase font-bold text-center block mb-2">Email OTP</label>
+                        <OTPInput
+                            length={6}
                             value={otp}
-                            onChange={e => setOtp(e.target.value)}
+                            onChange={setOtp}
                         />
                         <p className="text-xs text-green-500 mt-1 flex items-center gap-1"><Mail size={12} /> OTP Sent to your email</p>
                     </div>

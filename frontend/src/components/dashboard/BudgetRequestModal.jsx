@@ -9,7 +9,6 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
     if (!isOpen) return null;
 
     const [amount, setAmount] = useState(currentBudget);
-    const [otp, setOtp] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 

@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { Github, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
+import OTPInput from "@/components/ui/OTPInput";
 import api from "@/lib/api"; 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -165,17 +166,18 @@ function LoginForm() {
                ) : (
                    <form onSubmit={handleVerifyMfa} className="space-y-4">
                         {/* MFA Form kept same... */}
-                        <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center">
-                            <p className="text-sm text-primary mb-2">Check your mail for OTP</p>
-                        </div>
-                        <div>
-                         <label className="text-gray-400 text-sm mb-1 block">Enter 6-Digit OTP</label>
-                         <input 
-                            type="text" placeholder="000000" value={formData.otp} onChange={e => setFormData({...formData, otp: e.target.value})}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-center text-2xl tracking-[0.5em] text-white focus:border-primary/50 outline-none font-mono"
-                            maxLength={6}
-                         />
-                      </div>
+                         <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center">
+                             <p className="text-sm text-primary mb-2">Check your mail for OTP</p>
+                         </div>
+                         <div>
+                          <label className="text-gray-400 text-sm mb-1 block text-center">Enter 6-Digit OTP</label>
+                          <OTPInput 
+                             length={6}
+                             value={formData.otp}
+                             onChange={(otp) => setFormData({...formData, otp})}
+                             className="mb-2"
+                          />
+                       </div>
                       {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
                       <Button onClick={handleVerifyMfa} className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying OTP...' : 'Verify Identity'}</Button>
                    </form>
