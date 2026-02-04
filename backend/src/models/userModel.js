@@ -28,10 +28,10 @@ export const findUserById = async (id) => {
   return result.rows[0];
 };
 
-// Save the Hashed OTP and Expiry to the user record
-export const saveMFASecret = async (userId, secret, expiry) => {
-  // We store it as "SECRET|EXPIRY" string for simplicity in this lab
-  const mfaData = `${secret}|${expiry}`;
+// Save the Hashed OTP, Expiry, and (Optional) Intent to the user record
+export const saveMFASecret = async (userId, secret, expiry, intent = 'LOGIN') => {
+  // We store it as "SECRET|EXPIRY|INTENT"
+  const mfaData = `${secret}|${expiry}|${intent}`;
   
   const query = `UPDATE users SET mfa_secret = $1 WHERE id = $2`;
   await pool.query(query, [mfaData, userId]);

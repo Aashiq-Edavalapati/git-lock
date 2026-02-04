@@ -26,12 +26,21 @@ export const register = async (req, res) => {
     // Create User
     const newUser = await createUser(email, fullName, passwordHash, role, null);
 
-    // Send Welcome Email
-    await sendWelcomeEmail(email, fullName);
+    // Generate secure 6-digit OTP for Email Verification
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiry = Date.now() + 10 * 60 * 1000; // 10 Minutes
+
+    // Save to DB
+    await saveMFASecret(newUser.id, otpHash, expiry, 'REGISTER');
+    
+    // console.log(`DEBUG ONLY: Generated OTP for ${email}: ${otp}`);
+    await sendMFAEmail(email, otp);
 
     res.status(201).json({ 
-      message: 'User registered successfully', 
-      user: newUser 
+      message: 'Account created. Please verify your email.', 
+      userId: newUser.id,
+      mfaRequired: true 
     });
 
   } catch (error) {
@@ -100,6 +109,16 @@ export const verifyMFA = async (req, res) => {
     const isValid = await bcrypt.compare(otp, hashedOtp);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid OTP' });
+    }
+
+    // Check Intent (REGISTER vs LOGIN)
+    // secretData format: HASH|EXPIRY|INTENT
+    const parts = secretData.split('|');
+    const intent = parts[2] || 'LOGIN'; // Default to LOGIN if missing
+
+    if (intent === 'REGISTER') {
+        const user = await findUserById(userId);
+        await sendWelcomeEmail(user.email, user.full_name);
     }
 
     await clearMFASecret(userId);

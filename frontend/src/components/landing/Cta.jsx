@@ -10,7 +10,7 @@ export default function Cta() {
                 <div className="relative z-10">
                     <h2 className="text-4xl font-bold mb-6">Ready to ship securely?</h2>
                     <p className="text-gray-400 mb-8 max-w-xl mx-auto">Stop worrying about payment. Start coding. Let GitLock handle the trust.</p>
-                    <Link href="/login" className="flex justify-center">
+                    <Link href="/register" className="flex justify-center">
                         <Button className="h-14 px-10 text-lg rounded-full">Get Started Now</Button>
                     </Link>
                 </div>
