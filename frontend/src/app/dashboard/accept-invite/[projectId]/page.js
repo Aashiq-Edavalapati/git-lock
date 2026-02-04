@@ -3,9 +3,6 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
-import api from "@/lib/api";
 import { ShieldCheck, Download, X, Eye, ArrowLeft, CheckCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useSidebar } from "@/context/SidebarContext";

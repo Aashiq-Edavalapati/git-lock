@@ -5,10 +5,12 @@ import { Bell, CheckCircle, Clock, ArrowUpRight } from "lucide-react";
 import api from "@/lib/api";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         fetchNotifications();
@@ -87,70 +89,54 @@ export default function NotificationsPage() {
             ) : (
                 <div className="space-y-3">
                     {notifications.map((n, i) => {
-                        const Content = () => (
-                            <div className="flex items-start gap-4 z-10 relative">
-                                <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-primary shadow-[0_0_10px_var(--primary)]' : 'bg-transparent'}`} />
-                                <div className="flex-1">
-                                    <p className={`text-lg mb-1 ${!n.is_read ? 'text-white font-medium' : 'text-gray-400'}`}>
-                                        {n.message}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <Clock size={12} />
-                                        <span>{new Date(n.created_at).toLocaleString()}</span>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    {n.link && (
-                                         <div className="p-2 bg-white/5 rounded-full text-gray-400 group-hover:text-white transition-colors">
-                                             <ArrowUpRight size={18} />
-                                         </div>
-                                    )}
-                                    {!n.is_read && (
-                                        <div className="p-2 bg-primary/10 rounded-full text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <CheckCircle size={18} />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-
-                        const baseClasses = `
-                            block w-full text-left group p-5 rounded-xl border transition-all relative overflow-hidden
-                            ${!n.is_read 
-                                ? 'bg-gradient-to-r from-primary/5 to-transparent border-primary/20 hover:border-primary/40' 
-                                : 'bg-white/5 border-white/5 hover:border-white/10'
-                            }
-                        `;
-
-                        if (n.link) {
-                            return (
-                                <Link
-                                    key={n.id}
-                                    href={n.link}
-                                    onClick={() => markAsRead(n.id, n.is_read)}
-                                >
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: i * 0.05 }}
-                                        className={baseClasses}
-                                    >
-                                        <Content />
-                                    </motion.div>
-                                </Link>
-                            );
-                        }
-
                         return (
                             <motion.div
                                 key={n.id}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.05 }}
-                                onClick={() => markAsRead(n.id, n.is_read)}
-                                className={`${baseClasses} cursor-pointer`}
+                                onClick={() => {
+                                    if (n.link) router.push(n.link);
+                                    if (!n.is_read) markAsRead(n.id, false);
+                                }}
+                                className={`
+                                    block w-full text-left group p-5 rounded-xl border transition-all relative overflow-hidden cursor-pointer
+                                    ${!n.is_read 
+                                        ? 'bg-gradient-to-r from-primary/5 to-transparent border-primary/20 hover:border-primary/40' 
+                                        : 'bg-white/5 border-white/5 hover:border-white/10'
+                                    }
+                                `}
                             >
-                                <Content />
+                                <div className="flex items-start gap-4 z-10 relative">
+                                    <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-primary shadow-[0_0_10px_var(--primary)]' : 'bg-transparent'}`} />
+                                    <div className="flex-1">
+                                        <p className={`text-lg mb-1 ${!n.is_read ? 'text-white font-medium' : 'text-gray-400'}`}>
+                                            {n.message}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <Clock size={12} />
+                                            <span>{new Date(n.created_at).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        {!n.is_read ? (
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    markAsRead(n.id, false);
+                                                }}
+                                                className="p-2 bg-primary/10 rounded-full text-primary hover:bg-primary hover:text-black transition-all"
+                                                title="Mark as read"
+                                            >
+                                                <CheckCircle size={18} />
+                                            </button>
+                                        ) : n.link && (
+                                             <div className="p-2 bg-white/5 rounded-full text-gray-400 group-hover:text-white transition-colors">
+                                                 <ArrowUpRight size={18} />
+                                             </div>
+                                        )}
+                                    </div>
+                                </div>
                             </motion.div>
                         );
                     })}

@@ -200,6 +200,14 @@ export default function ProjectDetailsPage({ params }) {
                              </Button>
                          </Link>
                      )}
+
+                     {isAssignedDev && !isLocked && (
+                        <Link href={`/dashboard/create?projectId=${id}&budget=${project.budget}`}>
+                            <Button className="bg-primary hover:bg-primary/80 text-black font-bold flex items-center gap-2">
+                                <Lock size={16} /> Create Lock
+                            </Button>
+                        </Link>
+                     )}
                 </div>
             </div>
             

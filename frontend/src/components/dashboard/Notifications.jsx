@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, ArrowUpRight, MessageSquare, Info, AlertCircle } from "lucide-react";
+import { Bell, ArrowUpRight, MessageSquare, Info, AlertCircle, Check } from "lucide-react";
 import api from "@/lib/api";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Notifications() {
     const [notifications, setNotifications] = useState([]);
@@ -11,6 +12,7 @@ export default function Notifications() {
     const [hasUnread, setHasUnread] = useState(false);
     // Ref to handle clicking outside to close dropdown (optional but good UX)
     const dropdownRef = useRef(null);
+    const router = useRouter();
 
     useEffect(() => {
         fetchNotifications();
@@ -43,11 +45,11 @@ export default function Notifications() {
         // Optimistic UI update
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
         setHasUnread(notifications.some(n => !n.is_read && n.id !== id));
-        
+
         try {
             await api.put(`/notifications/${id}/read`);
-        } catch (e) { 
-            console.error(e); 
+        } catch (e) {
+            console.error(e);
         }
     };
 
@@ -58,6 +60,7 @@ export default function Notifications() {
         // If it's a link, we want to close the dropdown so the user sees the new page
         if (notification.link) {
             setShowDropdown(false);
+            router.push(notification.link);
         }
     };
 
@@ -74,9 +77,8 @@ export default function Notifications() {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className={`relative p-3 rounded-full transition-all duration-200 ${
-                    showDropdown ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-gray-400 hover:text-white'
-                }`}
+                className={`relative p-3 rounded-full transition-all duration-200 ${showDropdown ? 'bg-white/10 text-white' : 'hover:bg-white/5 text-gray-400 hover:text-white'
+                    }`}
             >
                 <Bell size={20} />
                 {hasUnread && (
@@ -99,7 +101,7 @@ export default function Notifications() {
                             </button>
                         )}
                     </div>
-                    
+
                     <div className="max-h-[24rem] overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ? (
                             <div className="p-12 text-center flex flex-col items-center gap-3">
@@ -109,16 +111,13 @@ export default function Notifications() {
                         ) : (
                             notifications.map(n => {
                                 const hasLink = !!n.link;
-                                const Wrapper = hasLink ? Link : 'div';
-                                const wrapperProps = hasLink ? { href: n.link } : {};
 
                                 return (
-                                    <Wrapper
+                                    <div
                                         key={n.id}
-                                        {...wrapperProps}
                                         onClick={() => handleNotificationClick(n)}
                                         className={`
-                                            block w-full text-left p-4 border-b border-white/5 transition-all duration-200 group
+                                            block w-full text-left p-4 border-b border-white/5 transition-all duration-200 group relative
                                             ${n.is_read ? 'hover:bg-white/5 opacity-80' : 'bg-white/[0.02] hover:bg-white/[0.08]'}
                                             ${hasLink ? 'cursor-pointer' : 'cursor-default'}
                                         `}
@@ -129,7 +128,7 @@ export default function Notifications() {
                                                 {getIcon(n.type)}
                                             </div>
 
-                                            <div className="flex-1">
+                                            <div className="flex-1 pr-6">
                                                 <p className={`text-sm leading-snug ${!n.is_read ? 'text-white font-medium' : 'text-gray-400'}`}>
                                                     {n.message}
                                                 </p>
@@ -143,22 +142,31 @@ export default function Notifications() {
                                                 </p>
                                             </div>
 
-                                            {/* Status Indicators */}
-                                            <div className="flex flex-col items-end gap-2 mt-1">
-                                                {!n.is_read && (
-                                                    <span className="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                                )}
-                                                
-                                                {/* Visual cue for link - becomes brighter on hover */}
-                                                {hasLink && (
-                                                    <ArrowUpRight 
-                                                        size={16} 
-                                                        className="text-gray-600 group-hover:text-primary transition-colors transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 duration-200" 
-                                                    />
+                                            {/* Status Indicators & Actions */}
+                                            <div className="flex flex-col items-end gap-2 mt-1 absolute right-4 top-4">
+                                                {!n.is_read ? (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            markAsRead(n.id);
+                                                        }}
+                                                        className="p-1 rounded-full bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+                                                        title="Mark as read"
+                                                    >
+                                                        <Check size={12} strokeWidth={3} />
+                                                    </button>
+                                                ) : (
+                                                    // If read, maybe showing nothing or valid indicator
+                                                    hasLink && (
+                                                        <ArrowUpRight
+                                                            size={16}
+                                                            className="text-gray-600 group-hover:text-primary transition-colors"
+                                                        />
+                                                    )
                                                 )}
                                             </div>
                                         </div>
-                                    </Wrapper>
+                                    </div>
                                 );
                             })
                         )}
