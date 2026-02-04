@@ -22,7 +22,10 @@ export const createOrder = async (req, res) => {
                 // 1. In-App Notification
                 await createNotification(
                     project.developer_id, 
-                    `Action Required: Client attempted to pay for "${project.title}" but failed because you haven't set a Payout Method. Please Configure it in Settings.`
+                    `Action Required: Client attempted to pay for "${project.title}" but failed because you haven't set a Payout Method. Please Configure it in Settings.`,
+                    'PAYMENT',
+                    project.id,
+                    '/dashboard/settings'
                 );
 
                 // 2. Email Notification
@@ -122,8 +125,8 @@ export const verifyAndUnlock = async (req, res) => {
     // Notifications
     const project = await findProjectById(projectId);
     if(project) {
-        await createNotification(project.client_id, `Payment Successful. Project "${project.title}" Unlocked.`);
-        await createNotification(project.developer_id, `Payment Secured in Escrow for "${project.title}". Code Released.`);
+        await createNotification(project.client_id, `Payment Successful. Project "${project.title}" Unlocked.`, 'PAYMENT', projectId, `/dashboard/escrow/${projectId}`);
+        await createNotification(project.developer_id, `Payment Secured in Escrow for "${project.title}". Code Released.`, 'PAYMENT', projectId, `/dashboard/escrow/${projectId}`);
     }
 
     res.status(200).json({ success: true, message: "Payment Verified & Project Unlocked" });

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, CheckCircle, Clock } from "lucide-react";
+import { Bell, CheckCircle, Clock, ArrowUpRight } from "lucide-react";
 import api from "@/lib/api";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function NotificationsPage() {
@@ -85,21 +86,8 @@ export default function NotificationsPage() {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {notifications.map((n, i) => (
-                        <motion.div
-                            key={n.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.05 }}
-                            onClick={() => markAsRead(n.id, n.is_read)}
-                            className={`
-                                group p-5 rounded-xl border transition-all cursor-pointer relative overflow-hidden
-                                ${!n.is_read 
-                                    ? 'bg-gradient-to-r from-primary/5 to-transparent border-primary/20 hover:border-primary/40' 
-                                    : 'bg-white/5 border-white/5 hover:border-white/10'
-                                }
-                            `}
-                        >
+                    {notifications.map((n, i) => {
+                        const Content = () => (
                             <div className="flex items-start gap-4 z-10 relative">
                                 <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-primary shadow-[0_0_10px_var(--primary)]' : 'bg-transparent'}`} />
                                 <div className="flex-1">
@@ -111,16 +99,61 @@ export default function NotificationsPage() {
                                         <span>{new Date(n.created_at).toLocaleString()}</span>
                                     </div>
                                 </div>
-                                {!n.is_read && (
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-4 top-1/2 -translate-y-1/2">
-                                        <div className="p-2 bg-primary/10 rounded-full text-primary">
+                                <div className="flex flex-col items-end gap-2">
+                                    {n.link && (
+                                         <div className="p-2 bg-white/5 rounded-full text-gray-400 group-hover:text-white transition-colors">
+                                             <ArrowUpRight size={18} />
+                                         </div>
+                                    )}
+                                    {!n.is_read && (
+                                        <div className="p-2 bg-primary/10 rounded-full text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                                             <CheckCircle size={18} />
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </motion.div>
-                    ))}
+                        );
+
+                        const baseClasses = `
+                            block w-full text-left group p-5 rounded-xl border transition-all relative overflow-hidden
+                            ${!n.is_read 
+                                ? 'bg-gradient-to-r from-primary/5 to-transparent border-primary/20 hover:border-primary/40' 
+                                : 'bg-white/5 border-white/5 hover:border-white/10'
+                            }
+                        `;
+
+                        if (n.link) {
+                            return (
+                                <Link
+                                    key={n.id}
+                                    href={n.link}
+                                    onClick={() => markAsRead(n.id, n.is_read)}
+                                >
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className={baseClasses}
+                                    >
+                                        <Content />
+                                    </motion.div>
+                                </Link>
+                            );
+                        }
+
+                        return (
+                            <motion.div
+                                key={n.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                onClick={() => markAsRead(n.id, n.is_read)}
+                                className={`${baseClasses} cursor-pointer`}
+                            >
+                                <Content />
+                            </motion.div>
+                        );
+                    })}
                 </div>
             )}
         </div>

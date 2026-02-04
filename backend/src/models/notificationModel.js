@@ -1,12 +1,12 @@
 import pool from '../config/db.js';
 
-export const createNotification = async (userId, message) => {
+export const createNotification = async (userId, message, type = 'GENERAL', referenceId = null, link = null) => {
   const query = `
-    INSERT INTO notifications (user_id, message)
-    VALUES ($1, $2)
+    INSERT INTO notifications (user_id, message, type, reference_id, link)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING *;
   `;
-  const result = await pool.query(query, [userId, message]);
+  const result = await pool.query(query, [userId, message, type, referenceId, link]);
   return result.rows[0];
 };
 

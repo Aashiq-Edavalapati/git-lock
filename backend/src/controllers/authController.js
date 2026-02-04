@@ -393,7 +393,7 @@ export const connectGithubAccount = async (req, res) => {
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
       [accessToken, githubProfile.id, req.user.id]);
 
-    await createNotification(req.user.id, `GitHub Account ${githubProfile.login || 'Unknown'} connected successfully.`);
+    await createNotification(req.user.id, `GitHub Account ${githubProfile.login || 'Unknown'} connected successfully.`, 'ACCOUNT', req.user.id, '/dashboard/settings');
 
     res.json({ message: 'Github account connected successfully', user: githubProfile });
 

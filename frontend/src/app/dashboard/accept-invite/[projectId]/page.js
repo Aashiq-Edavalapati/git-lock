@@ -40,9 +40,8 @@ export default function AcceptInvitePage({ params }) {
     const handleAccept = async () => {
         setIsAccepting(true);
         try {
-            await api.post(`/projects/${projectId}/accept`);
-            // Show success animation or toast if needed, then redirect
-            // Ideally redirect to the project dashboard or escrow page
+            await api.post('/projects/accept', { projectId });
+
             router.push(`/dashboard/projects/${projectId}`); 
         } catch (error) {
             console.error(error);

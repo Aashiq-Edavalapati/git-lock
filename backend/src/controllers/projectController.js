@@ -101,7 +101,14 @@ export const initProject = async (req, res) => {
     }
 
     // D. Notification
-    await createNotification(clientId, `Project Created: ${title}`);
+    await createNotification(clientId, `Project Created: ${title}`, 'PROJECT', newProject.id, `/dashboard/projects/${newProject.id}`);
+
+    if (developerEmail) {
+        const developer = await findUserByEmail(developerEmail);
+        if (developer) {
+            await createNotification(developer.id, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
+        }
+    }
 
     res.status(201).json({
       message: developerEmail ? 'Project created and invite sent' : 'Project created (No developer invited yet)',
@@ -161,11 +168,11 @@ export const inviteDeveloper = async (req, res) => {
     // D. Send Email
     await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
 
-    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`);
+    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
     
     const developer = await findUserByEmail(developerEmail);
     if (developer) {
-        await createNotification(developer.id, `You received an invitation for project "${project.title}"`);
+        await createNotification(developer.id, `You received an invitation for project "${project.title}"`, 'PROJECT', projectId, `/dashboard/accept-invite/${projectId}`);
     }
 
     res.status(200).json({ message: 'Invite sent successfully', project: result.rows[0] });
@@ -203,14 +210,14 @@ export const removeDeveloper = async (req, res) => {
         const result = await pool.query(query, [projectId]);
 
         // Notifications
-        await createNotification(clientId, `Developer removed from "${project.title}". Project is now Open.`);
+        await createNotification(clientId, `Developer removed from "${project.title}". Project is now Open.`, 'PROJECT', project.id, `/dashboard/projects/${project.id}`);
         
         // If developer was already assigned/invited, notify them
         if (oldDevEmail) {
             // Try to find if they are a registered user to send in-app notification
             const devUser = await findUserByEmail(oldDevEmail);
             if (devUser) {
-                 await createNotification(devUser.id, `You have been removed from project "${project.title}" by the client.`);
+                 await createNotification(devUser.id, `You have been removed from project "${project.title}" by the client.`, 'PROJECT', project.id, `/dashboard`);
             }
 
             // Send Email Notification (Crucial for active projects)
@@ -259,8 +266,8 @@ export const acceptProject = async (req, res) => {
     const result = await pool.query(query, [developerId, projectId]);
 
     // Notifications
-    await createNotification(project.client_id, `Developer ${developerEmail} accepted your invite for "${project.title}"`);
-    await createNotification(developerId, `You successfully joined project "${project.title}"`);
+    await createNotification(project.client_id, `Developer ${developerEmail} accepted your invite for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+    await createNotification(developerId, `You successfully joined project "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
 
     res.status(200).json({ message: 'Project accepted!', project: result.rows[0] });
 
@@ -302,7 +309,7 @@ export const revokeProjectAcceptance = async (req, res) => {
 
         // Notifications
         // 1. In-App to Client
-        await createNotification(project.client_id, `URGENT: Developer has revoked acceptance for "${project.title}". Project is now OPEN.`);
+        await createNotification(project.client_id, `URGENT: Developer has revoked acceptance for "${project.title}". Project is now OPEN.`, 'PROJECT', project.id, `/dashboard/projects/${project.id}`);
         
         // 2. Email to Client
         const clientUser = await findUserById(project.client_id);
@@ -419,24 +426,28 @@ export const uploadCode = async (req, res) => {
     await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl, readmeBase64);
     await updateProjectStatus(projectId, 'LOCKED_REVIEW');
 
-    res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
-    
     // Notification Logic
     const project = await findProjectById(projectId);
+    const cleanStagingUrl = stagingUrl ? stagingUrl.replace(/\/$/, "") : stagingUrl;
+    
     const notificationMsg = `
       New Code Locked for "${project.title}".
       - Deploy Status: Verified (Success)
-      - Staging URL: ${cleanProvidedUrl || stagingUrl}
+      - Staging URL: ${cleanStagingUrl}
       - GitHub Commit: ${commitSha} (Verified)
       - Integrity Check: Passed (Matches GitHub Source)
     `.trim();
 
-    await createNotification(project.client_id, notificationMsg);
-    await createNotification(project.developer_id, `Code uploaded successfully for "${project.title}". Validation passed.`);
+    await createNotification(project.client_id, notificationMsg, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
+    await createNotification(project.developer_id, `Code uploaded successfully for "${project.title}". Validation passed.`, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
+
+    res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Verification failed. Ensure you uploaded the ZIP exported from GitHub.' });
+    if (!res.headersSent) {
+        res.status(500).json({ error: 'Verification failed. Ensure you uploaded the ZIP exported from GitHub.' });
+    }
   }
 };
 
@@ -597,7 +608,7 @@ export const requestLockModification = async (req, res) => {
         await pool.query(query, [projectId, developerId, requestType]);
 
         // Notify Client
-        await createNotification(project.client_id, `Lock Modification Requested: ${requestType} for "${project.title}". Please review.`);
+        await createNotification(project.client_id, `Lock Modification Requested: ${requestType} for "${project.title}". Please review.`, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
 
         res.json({ message: 'Request sent to client' });
     } catch (e) {
@@ -644,7 +655,7 @@ export const approveLockModification = async (req, res) => {
         
         // Notify Developer
         const project = await findProjectById(lockRequest.project_id);
-        await createNotification(lockRequest.requester_id, `Lock Modification APPROVED for "${project.title}". You can now update the lock.`);
+        await createNotification(lockRequest.requester_id, `Lock Modification APPROVED for "${project.title}". You can now update the lock.`, 'PROJECT', lockRequest.project_id, `/dashboard/escrow/${lockRequest.project_id}`);
 
         res.json({ message: 'Request Approved & Project Unlocked' });
 
@@ -683,7 +694,7 @@ export const updateSafeDetails = async (req, res) => {
         
         // Notify Developer
         if (project.developer_id) {
-             createNotification(project.developer_id, `Project details updated: "${title}"`);
+             createNotification(project.developer_id, `Project details updated: "${title}"`, 'PROJECT', id, `/dashboard/projects/${id}`);
         }
 
         res.json({ message: 'Project details updated' });
@@ -724,7 +735,7 @@ export const requestBudgetUpdate = async (req, res) => {
         await pool.query('UPDATE projects SET pending_budget = $1 WHERE id = $2', [newBudget, id]);
 
         // Notify Developer (Action Required)
-        await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`);
+        await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`, 'PROJECT', id, `/dashboard/projects/${id}`);
             // Email
         const devUser = await findUserById(project.developer_id);
             await sendNotificationEmail(
@@ -800,7 +811,7 @@ export const approveBudgetUpdate = async (req, res) => {
         await pool.query('UPDATE projects SET budget = $1, pending_budget = NULL WHERE id = $2', [newBudget, id]);
 
         // Notify Client
-        await createNotification(project.client_id, `Budget Approved! New budget for "${project.title}" is ₹${newBudget}.`);
+        await createNotification(project.client_id, `Budget Approved! New budget for "${project.title}" is ₹${newBudget}.`, 'PROJECT', id, `/dashboard/projects/${id}`);
         
         res.json({ message: 'Budget updated successfully' });
 
@@ -823,7 +834,7 @@ export const rejectBudgetUpdate = async (req, res) => {
         await pool.query('UPDATE projects SET pending_budget = NULL WHERE id = $1', [id]);
 
         // Notify Client
-        await createNotification(project.client_id, `Budget Change Rejected for "${project.title}".`);
+        await createNotification(project.client_id, `Budget Change Rejected for "${project.title}".`, 'PROJECT', id, `/dashboard/projects/${id}`);
         
         res.json({ message: 'Budget update rejected' });
 
@@ -866,7 +877,7 @@ export const deleteProject = async (req, res) => {
              // In-App Notification to Developer
              const devUser = await findUserByEmail(devEmail);
              if (devUser) {
-                 await createNotification(devUser.id, `Project DELETED: "${project.title}" has been deleted by the client.`);
+                 await createNotification(devUser.id, `Project DELETED: "${project.title}" has been deleted by the client.`, 'PROJECT', id, `/dashboard`);
              }
 
              // Email Notification to Developer
@@ -879,7 +890,7 @@ export const deleteProject = async (req, res) => {
 
         // Notify Client (In-App Only)
         // Even though they triggered it, it's good for audit/confirmation log in their notification tray
-        await createNotification(clientId, `You deleted project "${project.title}".`);
+        await createNotification(clientId, `You deleted project "${project.title}".`, 'PROJECT', id, `/dashboard`);
 
         await deleteProjectModel(id);
 

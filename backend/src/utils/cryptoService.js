@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Ensure key is 32 bytes (256 bits)
-const KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'utf-8');
+const KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
 const ALGORITHM = 'aes-256-cbc';
 
 // Helper: Generate SHA-256 Hash (Rubric #4)
