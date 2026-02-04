@@ -1,9 +1,11 @@
 "use client";
 
-import { ShieldCheck, Download, X } from "lucide-react";
+import { ShieldCheck, Download, X, Eye } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { useState } from "react";
 
 export default function AcceptInviteModal({ isOpen, onClose, project, isDev = true, isAccepting, onConfirm }) {
+    const [previewFile, setPreviewFile] = useState(null);
 
     if (!isOpen || !project) return null;
 
@@ -81,9 +83,23 @@ export default function AcceptInviteModal({ isOpen, onClose, project, isDev = tr
                                                 <p className="text-xs text-gray-500">{file.size}</p>
                                             </div>
                                         </div>
-                                        <button className="text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Download">
-                                            <Download size={16} />
-                                        </button>
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => setPreviewFile(file)}
+                                                className="text-gray-500 hover:text-white p-1"
+                                                title="Preview"
+                                            >
+                                                <Eye size={16} />
+                                            </button>
+                                            <a
+                                                href={file.url}
+                                                download={file.name}
+                                                className="text-gray-500 hover:text-white p-1"
+                                                title="Download"
+                                            >
+                                                <Download size={16} />
+                                            </a>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -123,6 +139,70 @@ export default function AcceptInviteModal({ isOpen, onClose, project, isDev = tr
 
                 </div>
             </div>
+
+            {/* Preview Modal Overlay */}
+            {previewFile && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="relative w-full h-full max-w-6xl max-h-[90vh] flex flex-col glass-card border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+
+                        {/* Preview Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
+                            <h3 className="text-white font-medium truncate max-w-md flex items-center gap-2">
+                                <Eye size={18} className="text-primary" />
+                                {previewFile.name}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={previewFile.url}
+                                    download={previewFile.name}
+                                    className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                    title="Download"
+                                >
+                                    <Download size={20} />
+                                </a>
+                                <button
+                                    onClick={() => setPreviewFile(null)}
+                                    className="p-2 text-gray-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Preview Content */}
+                        <div className="flex-1 bg-black/50 flex items-center justify-center overflow-hidden p-4 relative">
+                            {previewFile.type === 'application/pdf' ? (
+                                <iframe
+                                    src={previewFile.url}
+                                    className="w-full h-full rounded-lg border border-white/10"
+                                    title="PDF Preview"
+                                />
+                            ) : previewFile.type.startsWith('image/') ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                    src={previewFile.url}
+                                    alt="Preview"
+                                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                                />
+                            ) : (
+                                <div className="text-center text-gray-400 flex flex-col items-center gap-4">
+                                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                                        <Download size={32} />
+                                    </div>
+                                    <p className="text-lg">Preview not available for this file type.</p>
+                                    <a
+                                        href={previewFile.url}
+                                        download={previewFile.name}
+                                        className="text-primary hover:underline"
+                                    >
+                                        Download to view
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

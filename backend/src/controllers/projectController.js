@@ -134,13 +134,18 @@ export const inviteDeveloper = async (req, res) => {
     if (req.files && req.files.length > 0) {
         // In a real app, upload to S3 here.
         // For now, we store metadata and simulate storage
-        attachments = req.files.map(file => ({
-            name: file.originalname,
-            size: (file.size / 1024).toFixed(2) + ' KB',
-            type: file.mimetype,
-            url: '#', // Mock URL
-            uploadedAt: new Date().toISOString()
-        }));
+        attachments = req.files.map(file => {
+            const base64 = file.buffer.toString('base64');
+            const dataUri = `data:${file.mimetype};base64,${base64}`;
+            
+            return {
+                name: file.originalname,
+                size: (file.size / 1024).toFixed(2) + ' KB',
+                type: file.mimetype,
+                url: dataUri, // Base64 Data URI
+                uploadedAt: new Date().toISOString()
+            };
+        });
     }
 
     // C. Update Database
