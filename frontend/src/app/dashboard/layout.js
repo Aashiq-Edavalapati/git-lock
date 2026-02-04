@@ -40,7 +40,9 @@ function DashboardContent({ children }) {
         try {
             const { data } = await import("@/lib/api").then(m => m.default.get('/auth/me'));
             setUser(data);
-        } catch(e) {}
+        } catch(e) {
+            window.location.href = '/login?message=Please log in to access the dashboard';
+        }
     }
     fetchUser();
   }, []);

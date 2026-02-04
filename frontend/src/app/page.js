@@ -1,5 +1,7 @@
 "use client";
 
+import useAuthRedirect from "@/hooks/useAuthRedirect";
+
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
 import DashboardPreview from "@/components/landing/DashboardPreview";
@@ -13,6 +15,10 @@ import Footer from "@/components/landing/Footer";
 import BackToTop from "@/components/landing/BackToTop";
 
 export default function Home() {
+  const { isLoading } = useAuthRedirect(true);
+
+  if (isLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
+
   return (
     <main className="min-h-screen relative flex flex-col items-center">
       <Navbar />

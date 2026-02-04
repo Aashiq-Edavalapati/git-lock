@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import PasswordInput from "@/components/ui/PasswordInput";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
+import useAuthRedirect from "@/hooks/useAuthRedirect";
 
 // Helper code duplicated for isolation (or could be moved to components)
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -25,10 +26,13 @@ function SocialLoginButton({ icon: Icon, text, onClick }) {
 }
 
 export default function RegisterPage() {
+  const { isLoading: authLoading } = useAuthRedirect(true);
   const router = useRouter();
   const [formData, setFormData] = useState({ fullName: "", email: "", password: "", role: "CLIENT" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  if (authLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   const handleRegister = async (e) => {
     e.preventDefault();

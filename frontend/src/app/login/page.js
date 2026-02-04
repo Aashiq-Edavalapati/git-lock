@@ -9,6 +9,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import api from "@/lib/api"; 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import useAuthRedirect from "@/hooks/useAuthRedirect";
 
 // 1. Get these from Environment Variables (Instructions below)
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -24,6 +25,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
+  const { isLoading: authLoading } = useAuthRedirect(true);
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState({ email: "", password: "", otp: "" });
   const [role, setRole] = useState("CLIENT"); // Default role
@@ -31,6 +33,8 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Login, 2: MFA
   const [userId, setUserId] = useState(null);
+
+  if (authLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   const handleLogin = async (e) => {
     e.preventDefault();
