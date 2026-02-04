@@ -74,12 +74,23 @@ function LoginForm() {
       localStorage.setItem('oauth_role', role);
 
       const callbackUrl = `${FRONTEND_URL}/auth/${provider}/callback`;
-      
-      if (provider === 'github') {
-          window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${callbackUrl}&scope=user:email repo`;
-      } else {
-          window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${callbackUrl}&response_type=code&scope=email profile`;
-      }
+        const encodedRedirectUri = encodeURIComponent(callbackUrl);
+
+        if (provider === 'github') {
+            window.location.href =
+                `https://github.com/login/oauth/authorize` +
+                `?client_id=${GITHUB_CLIENT_ID}` +
+                `&redirect_uri=${encodedRedirectUri}` +
+                `&scope=user:email repo`;
+        } else {
+            window.location.href =
+                `https://accounts.google.com/o/oauth2/v2/auth` +
+                `?client_id=${GOOGLE_CLIENT_ID}` +
+                `&redirect_uri=${encodedRedirectUri}` +
+                `&response_type=code` +
+                `&scope=email profile`;
+        }
+
   };
 
   return (

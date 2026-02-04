@@ -42,7 +42,7 @@ export const getGoogleToken = async (code) => {
     client_secret: process.env.GOOGLE_CLIENT_SECRET,
     code,
     grant_type: 'authorization_code',
-    redirect_uri: `${process.env.FRONTEND_URL}/auth/google/callback` // Must match Google Console
+    redirect_uri: `${process.env.FRONTEND_URL}/auth/google/callback`
   });
   return data; // access_token, id_token
 };
