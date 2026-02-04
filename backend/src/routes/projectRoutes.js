@@ -24,7 +24,7 @@ router.delete('/:id', authenticateToken, requireRole('CLIENT'), deleteProject);
 router.post('/create', authenticateToken, requireRole('CLIENT'), initProject);
 
 // Client invites developer later
-router.post('/invite', authenticateToken, requireRole('CLIENT'), inviteDeveloper);
+router.post('/invite', authenticateToken, requireRole('CLIENT'), upload.array('attachments'), inviteDeveloper);
 router.post('/cancel-invite', authenticateToken, requireRole('CLIENT'), removeDeveloper);
 
 // Developer accepts invite

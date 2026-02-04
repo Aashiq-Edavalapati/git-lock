@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import BudgetRequestModal from "@/components/dashboard/BudgetRequestModal";
 import BudgetApprovalModal from "@/components/dashboard/BudgetApprovalModal";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
-import InviteDevModal from "@/components/dashboard/InviteDevModal";
 
 export default function ProjectDetailsPage({ params }) {
     const { id } = use(params);
@@ -29,7 +28,6 @@ export default function ProjectDetailsPage({ params }) {
     const [isApprovingBudget, setIsApprovingBudget] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [showInviteModal, setShowInviteModal] = useState(false);
     
     // Revoke State
     const [showRevokeModal, setShowRevokeModal] = useState(false);
@@ -106,7 +104,6 @@ export default function ProjectDetailsPage({ params }) {
             return;
         }
 
-        // Reject Action (No OTP needed for rejection)
         if(!confirm(`Are you sure you want to REJECT the budget change?`)) return;
         setIsApprovingBudget(true);
         try {
@@ -117,17 +114,6 @@ export default function ProjectDetailsPage({ params }) {
             alert(err.response?.data?.error || "Action failed");
         } finally {
             setIsApprovingBudget(false);
-        }
-    };
-    
-
-    const handleInvite = async ({ email, subject, body }) => {
-        try {
-          await api.post('/projects/invite', { projectId: id, developerEmail: email, subject, body });
-          fetchData();
-          alert("Invite Sent!");
-        } catch (err) {
-          alert(err.response?.data?.error || "Failed to invite");
         }
     };
 
@@ -331,7 +317,7 @@ export default function ProjectDetailsPage({ params }) {
                              <div className="text-center py-4 space-y-3">
                                  <p className="text-gray-500 text-sm">{project.developer_email ? `Invite pending for ${project.developer_email}` : "No developer assigned"}</p>
                                  {isOwner && (
-                                     <Button onClick={() => setShowInviteModal(true)} className="h-8 text-xs">
+                                     <Button onClick={() => router.push(`/dashboard/invite/${project.id}`)} className="h-8 text-xs">
                                          {project.developer_email ? 'Resend Invite' : 'Invite Developer'}
                                      </Button>
                                  )}
@@ -377,12 +363,6 @@ export default function ProjectDetailsPage({ params }) {
                 isLoading={isRevoking}
             />
 
-            <InviteDevModal
-                isOpen={showInviteModal}
-                onClose={() => setShowInviteModal(false)}
-                onSend={handleInvite}
-                defaultEmail={project.developer_email || ""}
-            />
         </div>
     );
 }

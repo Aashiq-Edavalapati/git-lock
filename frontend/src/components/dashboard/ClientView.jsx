@@ -7,7 +7,6 @@ import Button from "@/components/ui/Button";
 import api from "@/lib/api";
 import Notifications from "./Notifications";
 
-import InviteDevModal from "./InviteDevModal";
 import ConfirmationModal from "./ConfirmationModal";
 import CreateProjectModal from "./CreateProjectModal";
 
@@ -15,12 +14,8 @@ export default function ClientView() {
   const [projects, setProjects] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [newProject, setNewProject] = useState({ title: "", budget: "" });
-  const [isCreating, setIsCreating] = useState(false);
 
-  // Invite Modal State
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [defaultInviteEmail, setDefaultInviteEmail] = useState("");
+
 
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -45,28 +40,7 @@ export default function ClientView() {
     }
   };
 
-  const openInviteModal = (projectId, email = "") => {
-    setSelectedProjectId(projectId);
-    setDefaultInviteEmail(email);
-    setShowInviteModal(true);
-  };
-
-  const handleSendInvite = async ({ email, subject, body }) => {
-    if (!selectedProjectId) return;
-    try {
-      await api.post('/projects/invite', {
-        projectId: selectedProjectId,
-        developerEmail: email,
-        subject,
-        body
-      });
-      refreshProjects();
-      alert("Invite Sent!");
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to invite");
-      throw err; // Re-throw to handle loading state in modal if needed
-    }
-  };
+  // Invite Logic moved to page /dashboard/invite/[id]
 
   const confirmDelete = (project) => {
     setProjectToDelete(project);
@@ -110,7 +84,6 @@ export default function ClientView() {
             <ProjectCard
               key={p.id}
               project={p}
-              onOpenInvite={openInviteModal}
               onDelete={() => confirmDelete(p)}
             />
           ))
@@ -124,13 +97,6 @@ export default function ClientView() {
         onCreate={handleCreate}
       />
 
-      {/* Invite Modal */}
-      <InviteDevModal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        onSend={handleSendInvite}
-        defaultEmail={defaultInviteEmail}
-      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
@@ -147,9 +113,7 @@ export default function ClientView() {
   );
 }
 
-function ProjectCard({ project, onOpenInvite, onEdit, onDelete }) {
-  const [email, setEmail] = useState("");
-
+function ProjectCard({ project, onDelete }) {
   return (
     <div className="glass-card p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-white/5 relative group">
 
@@ -182,20 +146,23 @@ function ProjectCard({ project, onOpenInvite, onEdit, onDelete }) {
         ) : (
           <div className="flex items-center justify-end gap-2">
 
-            {/* If Invite Sent, allow re-invite but maybe show 'Invite Sent' status clearly */}
+            {/* If Invite Sent, display status but allow re-sending via the page */}
             {project.status === 'INVITE_SENT' ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-yellow-500">Invite Sent ({project.developer_email})</span>
-                <Button onClick={() => onOpenInvite(project.id, project.developer_email)} className="h-8 text-xs bg-white/5 hover:bg-white/10 border border-white/10">
-                  Resend
-                </Button>
+                <Link href={`/dashboard/invite/${project.id}`}>
+                  <Button className="h-8 text-white text-xs bg-white/5 hover:bg-white/10 border border-white/10">
+                    Resend
+                  </Button>
+                </Link>
               </div>
             ) : (
               <>
-
-                <Button onClick={() => onOpenInvite(project.id, email)} className="h-8 text-xs min-w-[80px]">
-                  Invite Developer
-                </Button>
+                <Link href={`/dashboard/invite/${project.id}`}>
+                  <Button className="h-8 text-xs min-w-[80px]">
+                    Invite Developer
+                  </Button>
+                </Link>
               </>
             )}
 

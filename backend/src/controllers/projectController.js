@@ -117,11 +117,10 @@ export const initProject = async (req, res) => {
 // 1.5 Send Invite (Late Invitation)
 export const inviteDeveloper = async (req, res) => {
   try {
-    const { projectId, developerEmail, subject, body } = req.body;
+    const { projectId, developerEmail, subject, body, requirements } = req.body;
     const clientId = req.user.id;
 
     // A. Authorization Check (Rubric #2: Access Control)
-    // We must ensure the person sending the invite is the CLIENT who OWNS the project.
     const project = await findProjectById(projectId);
     
     if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -130,12 +129,31 @@ export const inviteDeveloper = async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized: You are not the owner of this project' });
     }
 
-    // B. Update Database
-    const query = `UPDATE projects SET developer_email = $1, status = 'INVITE_SENT' WHERE id = $2 RETURNING *`;
-    const result = await pool.query(query, [developerEmail, projectId]);
+    // B. Handle Attachments
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+        // In a real app, upload to S3 here.
+        // For now, we store metadata and simulate storage
+        attachments = req.files.map(file => ({
+            name: file.originalname,
+            size: (file.size / 1024).toFixed(2) + ' KB',
+            type: file.mimetype,
+            url: '#', // Mock URL
+            uploadedAt: new Date().toISOString()
+        }));
+    }
 
-    // C. Send Email
-    // We need client email. In a real app, fetch it. Here assuming req.user has it.
+    // C. Update Database
+    // We update developer_email, status, requirements, and attachments
+    const query = `
+        UPDATE projects 
+        SET developer_email = $1, status = 'INVITE_SENT', requirements = $3, attachments = $4
+        WHERE id = $2 
+        RETURNING *
+    `;
+    const result = await pool.query(query, [developerEmail, projectId, requirements, JSON.stringify(attachments)]);
+
+    // D. Send Email
     await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
 
     await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`);

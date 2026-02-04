@@ -17,8 +17,10 @@ export default function DashboardPage() {
           setRole(res.data.role);
           setLoading(false);
       })
-      .catch(() => {
-          // Redirect to login if failed
+      .catch(async () => {
+          try {
+             await api.post('/auth/logout');
+          } catch(e) { console.error("Logout failed during cleanup", e); }
           window.location.href = '/login';
       });
   }, []);
