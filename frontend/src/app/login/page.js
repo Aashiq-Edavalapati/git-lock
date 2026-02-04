@@ -106,11 +106,14 @@ function LoginForm() {
             <div className="absolute bottom-[-20%] right-[-20%] w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px]" />
          </div>
          <div className="relative z-10">
-            <div className="flex items-center gap-2 text-2xl font-bold tracking-tighter text-white">
+            <Link href="/" className="inline-block">
+                <div className="flex items-center gap-2 text-2xl font-bold tracking-tighter text-white cursor-pointer hover:opacity-90 transition">
                 <div className="w-3 h-3 bg-primary rounded-full shadow-[0_0_15px_var(--primary)]" />
                 GitLock
-            </div>
+                </div>
+            </Link>
          </div>
+
          <div className="relative z-10 space-y-8 max-w-lg">
             <h1 className="text-5xl font-bold leading-tight text-white">
                Trust is good. <br/>
