@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import OTPInput from "@/components/ui/OTPInput";
+import ResendOTP from "@/components/ui/ResendOTP";
 import { Loader2, DollarSign, Lock, Mail } from "lucide-react";
 import api from "@/lib/api";
 
@@ -77,6 +78,7 @@ export default function BudgetApprovalModal({ isOpen, onClose, projectId, curren
                             onChange={setOtp}
                         />
                         <p className="text-xs text-green-500 mt-1 flex items-center gap-1"><Mail size={12} /> OTP Sent to your email</p>
+                        <ResendOTP onResend={handleSendOTP} className="mt-2" />
                     </div>
                 )}
 

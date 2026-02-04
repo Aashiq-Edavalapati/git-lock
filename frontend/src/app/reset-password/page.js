@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Lock, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
+import PasswordInput from "@/components/ui/PasswordInput";
 import api from "@/lib/api";
 
 export default function ResetPasswordPage() {
@@ -89,32 +90,20 @@ function ResetPasswordForm() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">New Password</label>
-                <div className="relative">
-                    <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
-                    <input 
-                        type="password" 
-                        required
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 p-3 text-white focus:border-primary/50 outline-none"
-                    />
-                </div>
+                <PasswordInput
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Confirm Password</label>
-                <div className="relative">
-                    <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
-                    <input 
-                        type="password" 
-                        required
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 p-3 text-white focus:border-primary/50 outline-none"
-                    />
-                </div>
+                <PasswordInput 
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                />
               </div>
 
               {status === "error" && (

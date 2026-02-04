@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import OTPInput from "@/components/ui/OTPInput";
+import ResendOTP from "@/components/ui/ResendOTP";
 import api from "@/lib/api";
 
 export default function LockRequestModal({ requestId, onClose, onSuccess }) {
@@ -65,6 +66,7 @@ export default function LockRequestModal({ requestId, onClose, onSuccess }) {
                         <Button onClick={verifyOtp} className="w-full" disabled={loading || otp.length !== 6}>
                             {loading ? <Loader2 className="animate-spin" /> : "Verify & Approve"}
                         </Button>
+                        <ResendOTP onResend={sendOtp} />
                     </div>
                 )}
 

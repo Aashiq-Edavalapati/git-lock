@@ -4,6 +4,8 @@ import { useState, Suspense } from "react";
 import { Github, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
 import OTPInput from "@/components/ui/OTPInput";
+import ResendOTP from "@/components/ui/ResendOTP";
+import PasswordInput from "@/components/ui/PasswordInput";
 import api from "@/lib/api"; 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -126,12 +128,13 @@ function LoginForm() {
                             className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
                          />
                       </div>
-                      <div>
-                         <input 
-                            type="password" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
-                         />
-                         <div className="flex justify-end mt-2">
+                      
+                       <div>
+                          <PasswordInput 
+                             value={formData.password} 
+                             onChange={e => setFormData({...formData, password: e.target.value})}
+                          />
+                          <div className="flex justify-end mt-2">
                              <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
                          </div>
                       </div>
@@ -183,6 +186,8 @@ function LoginForm() {
                        </div>
                       {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={10}/> {error}</p>}
                       <Button onClick={handleVerifyMfa} className="w-full h-12" disabled={isLoading}>{isLoading ? 'Verifying OTP...' : 'Verify Identity'}</Button>
+                      
+                      <ResendOTP onResend={async () => await api.post('/auth/resend-login-otp', { userId })} />
                    </form>
                )}
             </div>

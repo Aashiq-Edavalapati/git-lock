@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import Button from "@/components/ui/Button";
 import OTPInput from "@/components/ui/OTPInput";
+import ResendOTP from "@/components/ui/ResendOTP";
 import { AlertCircle } from "lucide-react";
 
 export default function DeleteConfirmationModal({ onClose }) {

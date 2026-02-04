@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   User, Github, CreditCard, Shield, Lock,
-  LogOut, Save, CheckCircle2, AlertCircle, Trash
+  LogOut, Save, CheckCircle2, AlertCircle, Trash, X
 } from "lucide-react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
@@ -12,6 +12,9 @@ import DeleteConfirmationModal from "@/components/dashboard/DeleteConfirmationMo
 import AddPayoutModal from "@/components/dashboard/AddPayoutModal";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
+import OTPInput from "@/components/ui/OTPInput";
+import ResendOTP from "@/components/ui/ResendOTP";
+import PasswordInput from "@/components/ui/PasswordInput";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,6 +23,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddPayoutModal, setShowAddPayoutModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [payoutMethods, setPayoutMethods] = useState([]);
   const [userData, setUserData] = useState({
     name: "",
@@ -278,7 +282,24 @@ export default function SettingsPage() {
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
               
               {/* Change Password Section */}
-              {userData.hasPassword && <ChangePasswordSection />}
+              {/* Change Password Section */}
+              {userData.hasPassword && (
+                <div className="bg-white/5 border border-white/10 p-6 rounded-xl flex items-center justify-between">
+                    <div>
+                        <h4 className="font-bold text-white flex items-center gap-2 mb-1">
+                            <Lock size={18} className="text-primary"/> Password
+                        </h4>
+                        <p className="text-xs text-gray-400">Regularly updating your password improves security.</p>
+                    </div>
+                    <Button variant="outline" onClick={() => setShowChangePasswordModal(true)}>
+                        Change Password
+                    </Button>
+                </div>
+              )}
+              
+              {showChangePasswordModal && (
+                  <ChangePasswordModal onClose={() => setShowChangePasswordModal(false)} />
+              )}
 
               <hr className="border-white/5 my-6" />
 
@@ -316,7 +337,9 @@ export default function SettingsPage() {
   );
 }
 
-function ChangePasswordSection() {
+
+
+function ChangePasswordModal({ onClose }) {
     const [step, setStep] = useState(1); // 1: Password Form, 2: MFA
     const [formData, setFormData] = useState({ oldPassword: "", newPassword: "", otp: "" });
     const [loading, setLoading] = useState(false);
@@ -362,68 +385,76 @@ function ChangePasswordSection() {
     };
 
     return (
-        <div className="bg-black/20 border border-white/10 p-6 rounded-xl">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Lock size={18} /> Change Password</h3>
-            
-            {message.text && (
-                <div className={`p-3 rounded-lg text-sm mb-4 ${message.type === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
-                    {message.text}
-                </div>
-            )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                animate={{ opacity: 1, scale: 1 }} 
+                className="w-full max-w-md bg-[#0A0A0A] border border-white/10 p-6 rounded-2xl relative shadow-2xl"
+            >
+                <button 
+                    onClick={onClose} 
+                    className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                >
+                    <X size={20}/>
+                </button>
 
-            {step === 1 ? (
-                <form onSubmit={handleInitiate} className="space-y-4 max-w-md">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Old Password</label>
-                        <input 
-                            type="password" 
-                            required
-                            value={formData.oldPassword}
-                            onChange={(e) => setFormData({...formData, oldPassword: e.target.value})}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
-                        />
-                        <div className="flex justify-end mt-1">
-                                <Link href="/forgot-password" className="text-[10px] text-primary hover:underline">Forgot password?</Link>
+                <h3 className="font-bold text-white mb-6 flex items-center gap-2 text-xl">
+                    <Lock size={20} className="text-primary"/> Change Password
+                </h3>
+                
+                {message.text && (
+                    <div className={`p-3 rounded-lg text-sm mb-4 ${message.type === 'error' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
+                        {message.text}
+                    </div>
+                )}
+
+                {step === 1 ? (
+                    <form onSubmit={handleInitiate} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Old Password</label>
+                            <PasswordInput 
+                                value={formData.oldPassword} 
+                                onChange={(e) => setFormData({...formData, oldPassword: e.target.value})}
+                                placeholder="Enter current password"
+                            />
+                            <div className="flex justify-end mt-1">
+                                    <Link href="/forgot-password" className="text-[10px] text-primary hover:underline">Forgot password?</Link>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">New Password</label>
-                        <input 
-                            type="password" 
-                            required
-                            placeholder="Min 6 characters"
-                            value={formData.newPassword}
-                            onChange={(e) => setFormData({...formData, newPassword: e.target.value})}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
-                        />
-                    </div>
-                    <Button type="submit" disabled={loading} className="w-full">
-                        {loading ? "Verifying..." : "Update Password"}
-                    </Button>
-                </form>
-            ) : (
-                <form onSubmit={handleFinalize} className="space-y-4 max-w-md">
-                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center mb-4">
-                        <p className="text-sm text-primary">Enter the 6-digit code sent to your email to confirm this change.</p>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Verification Code</label>
-                        <input 
-                            type="text" 
-                            required
-                            maxLength={6}
-                            placeholder="000000"
-                            value={formData.otp}
-                            onChange={(e) => setFormData({...formData, otp: e.target.value})}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-center text-white text-lg tracking-widest focus:border-primary/50 outline-none"
-                        />
-                    </div>
-                    <Button type="submit" disabled={loading} className="w-full">
-                        {loading ? "Updating..." : "Verify & Change Password"}
-                    </Button>
-                    <button type="button" onClick={() => setStep(1)} className="w-full text-xs text-gray-500 hover:text-white mt-2">Cancel</button>
-                </form>
-            )}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">New Password</label>
+                            <PasswordInput 
+                                value={formData.newPassword} 
+                                onChange={(e) => setFormData({...formData, newPassword: e.target.value})}
+                                placeholder="Min 6 characters"
+                            />
+                        </div>
+                        <Button type="submit" disabled={loading} className="w-full h-12">
+                            {loading ? "Verifying..." : "Next Step"}
+                        </Button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleFinalize} className="space-y-4">
+                        <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg text-center mb-4">
+                            <p className="text-sm text-primary">Enter the 6-digit code sent to your email to confirm this change.</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 text-center">Verification Code</label>
+                            <OTPInput 
+                                length={6}
+                                value={formData.otp}
+                                onChange={(val) => setFormData({...formData, otp: val})}
+                                className="mb-4"
+                            />
+                        </div>
+                        <Button type="submit" disabled={loading} className="w-full h-12">
+                            {loading ? "Updating..." : "Verify & Change Password"}
+                        </Button>
+                        <ResendOTP onResend={async () => await api.post('/auth/change-password/initiate', { oldPassword: formData.oldPassword })} />
+                        <button type="button" onClick={() => setStep(1)} className="w-full text-xs text-gray-500 hover:text-white mt-2">Back to Details</button>
+                    </form>
+                )}
+            </motion.div>
         </div>
     );
 }

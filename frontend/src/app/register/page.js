@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { UserPlus, AlertCircle, Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import PasswordInput from "@/components/ui/PasswordInput";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -80,9 +81,9 @@ export default function RegisterPage() {
                   />
                </div>
                <div>
-                  <input 
-                     type="password" placeholder="Password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
-                     className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
+                  <PasswordInput 
+                     value={formData.password} 
+                     onChange={e => setFormData({...formData, password: e.target.value})}
                   />
                </div>
                

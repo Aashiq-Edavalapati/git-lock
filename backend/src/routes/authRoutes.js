@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP, forgotPassword, resetPassword, initiateChangePassword, finalizeChangePassword } from '../controllers/authController.js';
+import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP, forgotPassword, resetPassword, initiateChangePassword, finalizeChangePassword, resendLoginOTP } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();

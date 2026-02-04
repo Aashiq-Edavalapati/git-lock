@@ -282,6 +282,32 @@ export const requestOTP = async (req, res) => {
   }
 };
 
+export const resendLoginOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    // Find User
+    const user = await findUserById(userId);
+    if (!user) return res.status(404).json({ error: 'User context not found' });
+
+    // Generate Secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiry = Date.now() + 10 * 60 * 1000; // 10 Minutes
+
+    await saveMFASecret(userId, otpHash, expiry);
+    
+    // console.log(`[RESEND LOGIN OTP] for ${user.email}: ${otp}`);
+    await sendMFAEmail(user.email, otp);
+
+    res.json({ message: 'New OTP sent to email' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to resend OTP' });
+  }
+};
+
 export const initiateDeleteAccount = async (req, res) => {
   try {
     const userId = req.user.id;
