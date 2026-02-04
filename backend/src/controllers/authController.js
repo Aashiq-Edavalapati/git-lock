@@ -111,7 +111,7 @@ export const verifyMFA = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', 
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
 
@@ -180,7 +180,7 @@ export const githubLogin = async (req, res) => {
     res.cookie('token', token, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production', 
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
     res.json({ token, user });
@@ -227,7 +227,7 @@ export const googleLogin = async (req, res) => {
     res.cookie('token', token, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production', 
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
 
@@ -525,7 +525,7 @@ export const finalizeChangePassword = async (req, res) => {
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'lax',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 1000 * 60 * 60 * 24 * 30
         });
 
