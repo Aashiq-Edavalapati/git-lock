@@ -59,7 +59,7 @@ export default function DeveloperView() {
                   </Button>
                 </Link>
               ) : project.status === 'INVITE_SENT' ? (
-                <Link href={`/dashboard/escrow/${project.id}`}>
+                <Link href={`/dashboard/accept-invite/${project.id}`}>
                   <Button variant="outline" className="flex items-center gap-2 text-yellow-400 border-yellow-400/20 hover:bg-yellow-400/10">
                     <ShieldCheck size={16} /> View Invite
                   </Button>

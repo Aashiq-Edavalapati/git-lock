@@ -2,10 +2,19 @@
 
 import { ShieldCheck, Download, X, Eye } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSidebar } from "@/context/SidebarContext";
 
 export default function AcceptInviteModal({ isOpen, onClose, project, isDev = true, isAccepting, onConfirm }) {
     const [previewFile, setPreviewFile] = useState(null);
+    const { setIsSidebarCollapsed } = useSidebar();
+
+    // Auto-collapse sidebar when preview is open
+    useEffect(() => {
+        if (previewFile) {
+            setIsSidebarCollapsed(true);
+        }
+    }, [previewFile, setIsSidebarCollapsed]);
 
     if (!isOpen || !project) return null;
 

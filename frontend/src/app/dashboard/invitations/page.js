@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { Mail, CheckCircle, XCircle, ArrowRight, Loader2, User } from "lucide-react";
 import Button from "@/components/ui/Button";
-import AcceptInviteModal from "@/components/dashboard/AcceptInviteModal";
 
 export default function InvitationsProxy() {
     // This is a client-side wrapper to avoid hydration issues if we need to check auth safely
@@ -12,13 +12,13 @@ export default function InvitationsProxy() {
 }
 
 function InvitationsPage() {
+    const router = useRouter();
     const [invites, setInvites] = useState({ sent: [], received: [], accepted: [] });
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
 
     // Modal State
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, project: null });
-    const [acceptModal, setAcceptModal] = useState({ isOpen: false, project: null });
 
     useEffect(() => {
         const loadData = async () => {
@@ -70,21 +70,8 @@ function InvitationsPage() {
         setConfirmModal({ isOpen: true, project });
     };
 
-    const handleAcceptClick = (project) => {
-        setAcceptModal({ isOpen: true, project });
-    };
-
-    const confirmAccept = async () => {
-         const { project } = acceptModal;
-         if (!project) return;
-         try {
-            await api.post('/projects/accept', { projectId: project.id });
-            window.location.reload(); 
-         } catch (e) {
-            alert(e.response?.data?.error || "Failed");
-         } finally {
-            setAcceptModal({ isOpen: false, project: null });
-         }
+    const handleReviewClick = (project) => {
+        router.push(`/dashboard/accept-invite/${project.id}`);
     };
 
     const confirmRemove = async () => {
@@ -121,7 +108,7 @@ function InvitationsPage() {
             {user?.role === 'DEVELOPER' && (
                 <Section title="Received Invitations" icon={Mail} count={invites.received.length} color="text-blue-400">
                     {invites.received.length === 0 ? <EmptyState text="No pending invitations received." /> : 
-                        invites.received.map(p => <InvitationCard key={p.id} project={p} type="RECEIVED" onAccept={() => handleAcceptClick(p)} />)
+                        invites.received.map(p => <InvitationCard key={p.id} project={p} type="RECEIVED" onReview={() => handleReviewClick(p)} />)
                     }
                 </Section>
             )}
@@ -155,14 +142,6 @@ function InvitationsPage() {
                 </div>
             )}
 
-            {/* Accept Invite Modal */}
-            <AcceptInviteModal 
-                isOpen={acceptModal.isOpen}
-                onClose={() => setAcceptModal({ isOpen: false, project: null })}
-                project={acceptModal.project}
-                onConfirm={confirmAccept}
-            />
-
         </div>
     );
 }
@@ -185,11 +164,8 @@ function EmptyState({ text }) {
     return <div className="p-8 border border-white/5 border-dashed rounded-xl text-center text-sm text-gray-500 bg-white/[0.02]">{text}</div>;
 }
 
-function InvitationCard({ project, type, role, onRemove, onAccept }) {
+function InvitationCard({ project, type, role, onRemove, onReview }) {
     const [actionLoading, setActionLoading] = useState(false);
-
-    // handleAccept and handleCancel logic is now moved up to parent (onAccept, onRemove)
-    // but we can keep local loading state visually if needed, though modal handles it better.
 
     return (
         <div className={`glass-card p-5 border rounded-xl flex items-center justify-between group transition-all ${type === 'RECEIVED' ? 'border-blue-500/20 bg-blue-500/5' : 'border-white/10 hover:border-primary/20'}`}>
@@ -230,8 +206,8 @@ function InvitationCard({ project, type, role, onRemove, onAccept }) {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                    {type === 'RECEIVED' && onAccept && (
-                        <Button onClick={onAccept} className="h-9 px-4 text-sm font-medium bg-blue-600 hover:bg-blue-700">
+                    {type === 'RECEIVED' && onReview && (
+                        <Button onClick={onReview} className="h-9 px-4 text-sm font-medium bg-blue-600 hover:bg-blue-700">
                             Review & Accept
                         </Button>
                     )}
