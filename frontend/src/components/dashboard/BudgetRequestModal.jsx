@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import { Loader2, DollarSign, ShieldCheck } from "lucide-react";
 import api from "@/lib/api";
 
-export default function BudgetRequestModal({ isOpen, onClose, projectId, currentBudget, onSuccess }) {
+export default function BudgetRequestModal({ isOpen, onClose, projectId, currentBudget, onSuccess, isDirectUpdate }) {
     if (!isOpen) return null;
 
     const [amount, setAmount] = useState(currentBudget);
@@ -16,7 +16,8 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
         setLoading(true);
         setError("");
         try {
-            await api.post(`/projects/${projectId}/budget-request`, { newBudget: amount });
+            const res = await api.post(`/projects/${projectId}/budget-request`, { newBudget: amount });
+            alert(res.data.message); // Use the message from backend
             onSuccess(amount);
             onClose();
         } catch (err) {
@@ -37,7 +38,9 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
                 </div>
 
                 <p className="text-gray-400 text-sm mb-4">
-                    Changing the budget requires Multi-Factor Authentication (OTP) and Developer Approval.
+                    {isDirectUpdate
+                        ? "Since no developer is assigned, this update will apply immediately."
+                        : "A developer is assigned, so they must approve this change via OTP."}
                 </p>
 
                 {error && <div className="bg-red-500/10 text-red-500 p-2 text-sm rounded mb-4">{error}</div>}
@@ -56,7 +59,7 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
 
                 <div className="flex gap-2 mt-6">
                     <Button onClick={handleSubmit} className="flex-1 bg-green-600 hover:bg-green-700" disabled={loading}>
-                        {loading ? <Loader2 className="animate-spin" size={16} /> : "Send Request"}
+                        {loading ? <Loader2 className="animate-spin" size={16} /> : (isDirectUpdate ? "Update Budget" : "Send Request")}
                     </Button>
                     <button onClick={onClose} className="p-2 text-gray-400 hover:text-white" disabled={loading}>Cancel</button>
                 </div>

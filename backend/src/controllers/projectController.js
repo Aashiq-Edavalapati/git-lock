@@ -694,26 +694,39 @@ export const requestBudgetUpdate = async (req, res) => {
         const { newBudget } = req.body;
         const clientId = req.user.id;
 
-        // No OTP check for Client Request anymore (Moved to Dev Approval)
-
         const project = await findProjectById(id);
         if (!project) return res.status(404).json({ error: 'Project not found' });
         if (project.client_id !== clientId) return res.status(403).json({ error: 'Unauthorized' });
+
+        // 1. No Invite Sent (No dev email, no dev id) -> Direct Update
+        if (!project.developer_email && !project.developer_id) {
+             await pool.query('UPDATE projects SET budget = $1, pending_budget = NULL WHERE id = $2', [newBudget, id]);
+             return res.json({ message: 'Budget updated successfully.' });
+        }
+
+        // 2. Invite Sent but Not Accepted (Dev email set, Dev ID null) -> BLOCK
+        if (project.developer_email && !project.developer_id) {
+            return res.status(400).json({ error: 'Cannot change budget while invite is pending. Revoke invite or wait for acceptance.' });
+        }
+
+        // 3. Invite Accepted (Dev ID set) -> Request Approval (Continue below)
+        if (!project.developer_id) {
+            // Should not happen given above logic, but safety check
+            return res.status(400).json({ error: 'Invalid project state.' });
+        }
 
         // Set Pending Budget
         await pool.query('UPDATE projects SET pending_budget = $1 WHERE id = $2', [newBudget, id]);
 
         // Notify Developer (Action Required)
-        if (project.developer_id) {
-            await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`);
-             // Email
-            const devUser = await findUserById(project.developer_id);
-             await sendNotificationEmail(
-                devUser.email, 
-                `Budget Change Request: ${project.title}`,
-                `The client wants to change the budget to ₹${newBudget}.\n\nPlease go to the dashboard to Approve or Reject this change.`
-            );
-        }
+        await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`);
+            // Email
+        const devUser = await findUserById(project.developer_id);
+            await sendNotificationEmail(
+            devUser.email, 
+            `Budget Change Request: ${project.title}`,
+            `The client wants to change the budget to ₹${newBudget}.\n\nPlease go to the dashboard to Approve or Reject this change.`
+        );
 
         res.json({ message: 'Budget update requested. Waiting for developer approval.' });
 

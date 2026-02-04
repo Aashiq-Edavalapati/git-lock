@@ -249,9 +249,18 @@ export default function ProjectDetailsPage({ params }) {
                         <div className="flex justify-between items-start mb-1">
                             <div className="text-xs text-gray-500 uppercase font-bold">Budget</div>
                             {isOwner && (
-                                <button onClick={() => setShowBudgetModal(true)} className="text-xs text-primary hover:underline ml-2">
-                                    {project.pending_budget ? "(Update Request)" : "Change"}
-                                </button>
+                                <>
+                                    {/* Disable if Invite Sent OR (Email set but no Dev ID) */ }
+                                    {(project.status === 'INVITE_SENT' || (project.developer_email && !project.developer_id)) ? (
+                                        <span className="text-xs text-gray-500 ml-2" title="Cannot change budget while invite is pending">
+                                            (Pending Invite)
+                                        </span>
+                                    ) : (
+                                        <button onClick={() => setShowBudgetModal(true)} className="text-xs text-primary hover:underline ml-2">
+                                            {project.pending_budget ? "(Update Request)" : "Change"}
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
                         <div className="text-white font-medium truncate flex items-center gap-2">
@@ -334,6 +343,7 @@ export default function ProjectDetailsPage({ params }) {
                 projectId={project.id}
                 currentBudget={project.pending_budget ? parseFloat(project.pending_budget) : parseFloat(project.budget)}
                 onSuccess={() => fetchData()} 
+                isDirectUpdate={!project.developer_id} 
             />
 
             <BudgetApprovalModal
