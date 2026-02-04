@@ -10,6 +10,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import DeleteConfirmationModal from "@/components/dashboard/DeleteConfirmationModal";
 import AddPayoutModal from "@/components/dashboard/AddPayoutModal";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import OTPInput from "@/components/ui/OTPInput";
@@ -24,6 +25,7 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddPayoutModal, setShowAddPayoutModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
   const [payoutMethods, setPayoutMethods] = useState([]);
   const [userData, setUserData] = useState({
     name: "",
@@ -55,7 +57,7 @@ export default function SettingsPage() {
         await api.delete(`/payouts/${id}`);
         fetchPayoutMethods();
     } catch(e) {
-        alert("Failed to delete");
+        setErrorModal({ isOpen: true, message: "Failed to delete" });
     }
   };
 
@@ -64,7 +66,7 @@ export default function SettingsPage() {
         await api.put(`/payouts/${id}/primary`);
         fetchPayoutMethods();
     } catch(e) {
-        alert("Failed to update");
+        setErrorModal({ isOpen: true, message: "Failed to update" });
     }
   };
 
@@ -319,6 +321,12 @@ export default function SettingsPage() {
                {showDeleteModal && (
                 <DeleteConfirmationModal onClose={() => setShowDeleteModal(false)} />
               )}
+
+                <ErrorModal
+                    isOpen={errorModal.isOpen}
+                    onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+                    message={errorModal.message}
+                />
            </motion.div>
         )}
 

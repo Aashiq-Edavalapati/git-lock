@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import BudgetRequestModal from "@/components/dashboard/BudgetRequestModal";
 import BudgetApprovalModal from "@/components/dashboard/BudgetApprovalModal";
 import ConfirmationModal from "@/components/dashboard/ConfirmationModal";
+import SuccessModal from "@/components/dashboard/SuccessModal";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 
 export default function ProjectDetailsPage({ params }) {
     const { id } = use(params);
@@ -33,6 +35,10 @@ export default function ProjectDetailsPage({ params }) {
     const [showRevokeModal, setShowRevokeModal] = useState(false);
     const [isRevoking, setIsRevoking] = useState(false);
 
+    // Modals State
+    const [successModal, setSuccessModal] = useState({ isOpen: false, message: '' });
+    const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
+
     const handleDelete = async () => {
         // Confirmation is handled by the Modal, so we proceed directly
         setIsDeleting(true);
@@ -40,7 +46,7 @@ export default function ProjectDetailsPage({ params }) {
             await api.delete(`/projects/${id}`);
             router.push('/dashboard');
         } catch (err) {
-            alert(err.response?.data?.error || "Failed to delete project");
+            setErrorModal({ isOpen: true, message: err.response?.data?.error || "Failed to delete project" });
             setIsDeleting(false); // Only reset if failed. If success, we redirect.
             setShowDeleteModal(false);
         }
@@ -52,7 +58,7 @@ export default function ProjectDetailsPage({ params }) {
             await api.post(`/projects/${id}/revoke`);
             router.push('/dashboard');
         } catch (err) {
-            alert(err.response?.data?.error || "Failed to revoke acceptance");
+            setErrorModal({ isOpen: true, message: err.response?.data?.error || "Failed to revoke acceptance" });
             setIsRevoking(false);
             setShowRevokeModal(false);
         }
@@ -90,9 +96,9 @@ export default function ProjectDetailsPage({ params }) {
             await api.put(`/projects/${id}/safe`, editForm);
             setProject(prev => ({ ...prev, ...editForm }));
             setIsEditing(false);
-            alert("Details updated successfully!");
+            setSuccessModal({ isOpen: true, message: "Details updated successfully!" });
         } catch (err) {
-            alert(err.response?.data?.error || "Failed to update details");
+            setErrorModal({ isOpen: true, message: err.response?.data?.error || "Failed to update details" });
         } finally {
             setIsSaving(false);
         }
@@ -109,9 +115,9 @@ export default function ProjectDetailsPage({ params }) {
         try {
             await api.post(`/projects/${id}/budget-reject`);
             fetchData();
-            alert(`Budget request rejected!`);
+            setSuccessModal({ isOpen: true, message: `Budget request rejected!` });
         } catch (err) {
-            alert(err.response?.data?.error || "Action failed");
+            setErrorModal({ isOpen: true, message: err.response?.data?.error || "Action failed" });
         } finally {
             setIsApprovingBudget(false);
         }
@@ -371,6 +377,18 @@ export default function ProjectDetailsPage({ params }) {
                 title="Revoke Acceptance?"
                 message="Are you sure you want to leave this project? The client will be notified."
                 isLoading={isRevoking}
+            />
+
+            <SuccessModal
+                isOpen={successModal.isOpen}
+                onClose={() => setSuccessModal({ ...successModal, isOpen: false })}
+                message={successModal.message}
+            />
+
+            <ErrorModal
+                isOpen={errorModal.isOpen}
+                onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+                message={errorModal.message}
             />
 
         </div>

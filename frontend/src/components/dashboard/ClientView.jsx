@@ -9,6 +9,7 @@ import Notifications from "./Notifications";
 
 import ConfirmationModal from "./ConfirmationModal";
 import CreateProjectModal from "./CreateProjectModal";
+import ErrorModal from "./ErrorModal";
 
 export default function ClientView() {
   const [projects, setProjects] = useState([]);
@@ -21,6 +22,7 @@ export default function ClientView() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
 
   useEffect(() => {
     refreshProjects();
@@ -36,7 +38,7 @@ export default function ClientView() {
       setShowModal(false);
       refreshProjects();
     } catch (err) {
-      alert("Failed to create project");
+      setErrorModal({ isOpen: true, message: "Failed to create project" });
     }
   };
 
@@ -57,7 +59,7 @@ export default function ClientView() {
       setShowDeleteModal(false);
       setProjectToDelete(null);
     } catch (err) {
-      alert(err.response?.data?.error || "Failed to delete project");
+      setErrorModal({ isOpen: true, message: err.response?.data?.error || "Failed to delete project" });
     } finally {
       setIsDeleting(false);
     }
@@ -107,6 +109,12 @@ export default function ClientView() {
         message={`Are you sure you want to delete "${projectToDelete?.title}"? This action cannot be undone.`}
         isLoading={isDeleting}
         loadingText="Deleting Project..."
+      />
+
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+        message={errorModal.message}
       />
 
     </div>

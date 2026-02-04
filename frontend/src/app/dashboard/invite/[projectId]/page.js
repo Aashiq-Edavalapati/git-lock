@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { Mail, ArrowLeft, Send, Upload, X, FileText, Loader2, ShieldCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
+import SuccessModal from "@/components/dashboard/SuccessModal";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 
 export default function InvitePage({ params }) {
     const { projectId } = use(params);
@@ -20,6 +22,10 @@ export default function InvitePage({ params }) {
     const [requirements, setRequirements] = useState("");
     const [attachments, setAttachments] = useState([]);
 
+    // Modals
+    const [successModal, setSuccessModal] = useState({ isOpen: false, message: '' });
+    const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
+
     useEffect(() => {
         // Fetch Project Details
         api.get(`/projects/${projectId}`)
@@ -32,7 +38,7 @@ export default function InvitePage({ params }) {
             })
             .catch(err => {
                 console.error(err);
-                alert("Failed to load project details");
+                setErrorModal({ isOpen: true, message: "Failed to load project details" });
                 router.push('/dashboard');
             })
             .finally(() => setLoading(false));
@@ -51,7 +57,7 @@ export default function InvitePage({ params }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!email || !subject || !body) {
-            alert("Please fill in required fields.");
+            setErrorModal({ isOpen: true, message: "Please fill in required fields." });
             return;
         }
 
@@ -72,12 +78,12 @@ export default function InvitePage({ params }) {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            alert("Invitation sent successfully!");
-            router.push('/dashboard');
+            setSuccessModal({ isOpen: true, message: "Invitation sent successfully!" });
+            // router.push('/dashboard'); // Moved to Modal action
 
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.error || "Failed to send invitation");
+            setErrorModal({ isOpen: true, message: error.response?.data?.error || "Failed to send invitation" });
         } finally {
             setSending(false);
         }
@@ -238,6 +244,20 @@ export default function InvitePage({ params }) {
                 </div>
 
             </div>
+            <SuccessModal
+                isOpen={successModal.isOpen}
+                onClose={() => {
+                    setSuccessModal({ ...successModal, isOpen: false });
+                    router.push('/dashboard');
+                }}
+                message={successModal.message}
+            />
+
+            <ErrorModal
+                isOpen={errorModal.isOpen}
+                onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+                message={errorModal.message}
+            />
         </div>
     );
 }

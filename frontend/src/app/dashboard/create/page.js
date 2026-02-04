@@ -130,13 +130,12 @@ function CreateLockForm() {
                 projectId, repoOwner, repoName, commitSha: commitSha, stagingUrl
             });
             setRepoStatus("success");
-            // alert("Verification Successful!");
+
         } catch (err) {
             setRepoStatus("error");
             console.error(err);
             const errMsg = err.response?.data?.error || "Unknown Error";
             setVerificationError(errMsg);
-            // alert(`Verification Failed: ${errMsg}`); // Removed alert in favor of UI message
         }
     } else {
         setVerificationError("Please fill all fields");
@@ -338,7 +337,7 @@ function CreateLockForm() {
                             if (droppedFile.name.endsWith('.zip')) {
                                 setFile(droppedFile);
                             } else {
-                                alert("Please upload a .zip file");
+                                setErrorModal({ open: true, title: "Invalid File", message: "Please upload a .zip file" });
                             }
                         }
                     }}

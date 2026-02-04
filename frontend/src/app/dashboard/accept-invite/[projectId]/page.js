@@ -3,9 +3,13 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
 import { ShieldCheck, Download, X, Eye, ArrowLeft, CheckCircle } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useSidebar } from "@/context/SidebarContext";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 
 export default function AcceptInvitePage({ params }) {
     const { projectId } = use(params);
@@ -15,6 +19,7 @@ export default function AcceptInvitePage({ params }) {
     const [isAccepting, setIsAccepting] = useState(false);
     const [previewFile, setPreviewFile] = useState(null);
     const { setIsSidebarCollapsed } = useSidebar();
+    const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
 
     useEffect(() => {
         // Fetch Project Details
@@ -24,7 +29,7 @@ export default function AcceptInvitePage({ params }) {
             })
             .catch(err => {
                 console.error(err);
-                alert("Failed to load project details");
+                setErrorModal({ isOpen: true, message: "Failed to load project details" });
                 router.push('/dashboard');
             })
             .finally(() => setLoading(false));
@@ -45,7 +50,7 @@ export default function AcceptInvitePage({ params }) {
             router.push(`/dashboard/projects/${projectId}`); 
         } catch (error) {
             console.error(error);
-            alert("Failed to accept invitation");
+            setErrorModal({ isOpen: true, message: "Failed to accept invitation" });
             setIsAccepting(false);
         }
     };
@@ -259,6 +264,12 @@ export default function AcceptInvitePage({ params }) {
                     </div>
                 </div>
             )}
+            
+            <ErrorModal
+                isOpen={errorModal.isOpen}
+                onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+                message={errorModal.message}
+            />
         </div>
     );
 }

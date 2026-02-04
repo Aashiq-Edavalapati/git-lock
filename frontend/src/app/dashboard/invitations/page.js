@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { Mail, CheckCircle, XCircle, ArrowRight, Loader2, User } from "lucide-react";
 import Button from "@/components/ui/Button";
+import ErrorModal from "@/components/dashboard/ErrorModal";
 
 export default function InvitationsProxy() {
     // This is a client-side wrapper to avoid hydration issues if we need to check auth safely
@@ -19,6 +20,7 @@ function InvitationsPage() {
 
     // Modal State
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, project: null });
+    const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' });
 
     useEffect(() => {
         const loadData = async () => {
@@ -82,7 +84,7 @@ function InvitationsPage() {
             await api.post('/projects/cancel-invite', { projectId: project.id });
             window.location.reload();
         } catch (e) {
-            alert(e.response?.data?.error || "Failed");
+            setErrorModal({ isOpen: true, message: e.response?.data?.error || "Failed" });
         } finally {
             setConfirmModal({ isOpen: false, project: null });
         }
@@ -141,6 +143,12 @@ function InvitationsPage() {
                     </div>
                 </div>
             )}
+
+            <ErrorModal
+                isOpen={errorModal.isOpen}
+                onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+                message={errorModal.message}
+            />
 
         </div>
     );

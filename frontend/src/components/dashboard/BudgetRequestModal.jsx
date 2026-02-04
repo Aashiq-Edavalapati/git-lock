@@ -4,6 +4,7 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { Loader2, DollarSign, ShieldCheck } from "lucide-react";
 import api from "@/lib/api";
+import SuccessModal from "./SuccessModal";
 
 export default function BudgetRequestModal({ isOpen, onClose, projectId, currentBudget, onSuccess, isDirectUpdate }) {
     if (!isOpen) return null;
@@ -11,15 +12,14 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
     const [amount, setAmount] = useState(currentBudget);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [successModal, setSuccessModal] = useState({ isOpen: false, message: '' });
 
     const handleSubmit = async () => {
         setLoading(true);
         setError("");
         try {
             const res = await api.post(`/projects/${projectId}/budget-request`, { newBudget: amount });
-            alert(res.data.message); // Use the message from backend
-            onSuccess(amount);
-            onClose();
+            setSuccessModal({ isOpen: true, message: res.data.message });
         } catch (err) {
             setError(err.response?.data?.error || "Request failed");
         } finally {
@@ -64,6 +64,16 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
                     <button onClick={onClose} className="p-2 text-gray-400 hover:text-white" disabled={loading}>Cancel</button>
                 </div>
             </div>
+
+            <SuccessModal
+                isOpen={successModal.isOpen}
+                onClose={() => {
+                    setSuccessModal({ ...successModal, isOpen: false });
+                    onSuccess(amount);
+                    onClose();
+                }}
+                message={successModal.message}
+            />
         </div>
     );
 }
