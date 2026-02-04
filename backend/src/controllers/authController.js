@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db.js';
-import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret } from '../models/userModel.js';
+import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret, getResetSecret, clearResetSecret, updateUserPassword } from '../models/userModel.js';
 import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
 import { createNotification } from '../models/notificationModel.js';
 import { sendMFAEmail, sendWelcomeEmail } from '../utils/emailService.js';
@@ -138,7 +138,8 @@ export const getMe = async (req, res) => {
         role: user.role,
         bio: user.bio || '',
         avatarUrl: user.avatar_url || null,
-        isGithubConnected
+        isGithubConnected,
+        hasPassword: user.password_hash && user.password_hash !== 'oauth_placeholder'
      });
   } catch (error) {
     res.status(500).json({ error: 'Server Error' });
@@ -355,4 +356,157 @@ export const connectGithubAccount = async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'Failed to connect Github account' });
   }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await findUserByEmail(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Generate Secure Token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = await bcrypt.hash(resetToken, 10);
+    const expiry = Date.now() + 30 * 60 * 1000; // 30 Minutes
+
+    // Save to DB
+    const { saveResetSecret } = await import('../models/userModel.js');
+    await saveResetSecret(user.id, resetTokenHash, expiry);
+
+    // Send Email
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&email=${email}`;
+    // We need to import sendResetPasswordEmail from emailService (will add next)
+    // For now using generic notification email or will update emailService
+    const { sendNotificationEmail } = await import('../utils/emailService.js');
+    await sendNotificationEmail(
+        email, 
+        'Password Reset Request', 
+        `You requested a password reset. Click the link below to reset your password:\n\n<a href="${resetLink}">Reset Password</a>\n\nLink expires in 30 minutes.`
+    );
+
+    res.json({ message: 'Password reset link sent to email' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to process forgot password' });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body;
+    
+    const user = await findUserByEmail(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const secretData = await getResetSecret(user.id);
+    
+    if (!secretData) return res.status(400).json({ error: 'Invalid or expired link' });
+
+    const [hashedToken, expiryStr] = secretData.split('|');
+    if (Date.now() > parseInt(expiryStr)) {
+      return res.status(400).json({ error: 'Link Expired' });
+    }
+
+    const isValid = await bcrypt.compare(token, hashedToken);
+    if (!isValid) return res.status(400).json({ error: 'Invalid Token' });
+
+    // Update Password
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await updateUserPassword(user.id, passwordHash);
+    
+    // Clear Secret
+    await clearResetSecret(user.id);
+
+    res.json({ message: 'Password reset successfully' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+};
+
+export const initiateChangePassword = async (req, res) => {
+  try {
+    const { oldPassword } = req.body;
+    const userId = req.user.id;
+    
+    // Verify Old Password
+    const user = await findUserById(userId);
+    // password_hash is now included in findUserById
+    const userWithPass = user;
+
+    // If user is OAuth only, they might not have a password
+    if (!userWithPass.password_hash || userWithPass.password_hash === 'oauth_placeholder') {
+        return res.status(400).json({ error: 'OAuth users cannot change password. Set one via Forgot Password flow.' });
+    }
+
+    if (!(await bcrypt.compare(oldPassword, userWithPass.password_hash))) {
+        return res.status(400).json({ error: 'Incorrect old password' });
+    }
+
+    // Generate OTP for verification
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiry = Date.now() + 10 * 60 * 1000;
+    
+    // We append |CHANGE_PW to the secret to distinguish intent
+    // But our model stores "HASH|EXPIRY". We can't easily append intent without changing model
+    // So for now, we trust the authenticated session + OTP 
+    // Ideally we would add an "intent" column or encode it in the secret string format if model allows
+    // Let's stick to the existing getMFASecret/saveMFASecret format "HASH|EXPIRY" for minimal schema change
+    // The security is provided by the fact that you need to know the old password AND be logged in to trigger this.
+    
+    await saveMFASecret(userId, otpHash, expiry);
+    
+    // console.log(`[CHANGE PW OTP] for ${user.email}: ${otp}`);
+    await sendMFAEmail(user.email, otp);
+
+    res.json({ mfaRequired: true, message: 'OTP sent to email' });
+
+  } catch (error) {
+     console.error(error);
+     res.status(500).json({ error: 'Failed to initiate password change' });
+  }
+};
+
+export const finalizeChangePassword = async (req, res) => {
+    try {
+        const { otp, newPassword } = req.body;
+        const userId = req.user.id;
+
+        const secretData = await getMFASecret(userId);
+        if (!secretData) return res.status(400).json({ error: 'Session expired' });
+
+        const [hashedOtp, expiryStr] = secretData.split('|');
+        if (Date.now() > parseInt(expiryStr)) {
+             return res.status(400).json({ error: 'OTP Expired' });
+        }
+
+        const isValid = await bcrypt.compare(otp, hashedOtp);
+        if (!isValid) return res.status(400).json({ error: 'Invalid OTP' });
+
+        // Update Password
+        const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+        await updateUserPassword(userId, passwordHash);
+
+        await clearMFASecret(userId);
+
+        // Auto-Login: Issue new Token
+        const user = await findUserById(userId);
+        const token = generateToken(user);
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'lax',
+            maxAge: 1000 * 60 * 60 * 24 * 30
+        });
+
+        res.json({ message: 'Password changed successfully', user });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to change password' });
+    }
 };

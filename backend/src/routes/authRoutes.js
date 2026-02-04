@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP } from '../controllers/authController.js';
+import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP, forgotPassword, resetPassword, initiateChangePassword, finalizeChangePassword } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -20,5 +20,10 @@ router.post('/request-otp', authenticateToken, requestOTP);
 router.post('/delete-account/initiate', authenticateToken, initiateDeleteAccount);
 router.delete('/delete-account', authenticateToken, deleteAccount);
 router.post('/verify-mfa', verifyMFA);
+
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.post('/change-password/initiate', authenticateToken, initiateChangePassword);
+router.post('/change-password/finalize', authenticateToken, finalizeChangePassword);
 
 export default router;

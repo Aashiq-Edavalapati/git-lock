@@ -131,6 +131,9 @@ function LoginForm() {
                             type="password" placeholder="Password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
                             className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-white focus:border-primary/50 outline-none"
                          />
+                         <div className="flex justify-end mt-2">
+                             <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                         </div>
                       </div>
                       
                       <RoleSelector role={role} setRole={setRole} />

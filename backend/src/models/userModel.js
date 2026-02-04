@@ -23,7 +23,7 @@ export const findUserByEmail = async (email) => {
 
 // Find user by ID (for MFA verification/Token generation)
 export const findUserById = async (id) => {
-  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url FROM users WHERE id = $1`;
+  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url, password_hash FROM users WHERE id = $1`;
   const result = await pool.query(query, [id]);
   return result.rows[0];
 };
@@ -58,6 +58,28 @@ export const updateUserProfile = async (userId, fullName, bio) => {
   `;
   const result = await pool.query(query, [fullName, bio, userId]);
   return result.rows[0];
+};
+
+export const saveResetSecret = async (userId, secret, expiry) => {
+  const resetData = `${secret}|${expiry}`;
+  const query = `UPDATE users SET reset_secret = $1 WHERE id = $2`;
+  await pool.query(query, [resetData, userId]);
+};
+
+export const getResetSecret = async (userId) => {
+  const query = `SELECT reset_secret FROM users WHERE id = $1`;
+  const result = await pool.query(query, [userId]);
+  return result.rows[0]?.reset_secret;
+};
+
+export const clearResetSecret = async (userId) => {
+  const query = `UPDATE users SET reset_secret = NULL WHERE id = $1`;
+  await pool.query(query, [userId]);
+};
+
+export const updateUserPassword = async (userId, passwordHash) => {
+  const query = `UPDATE users SET password_hash = $1 WHERE id = $2`;
+  await pool.query(query, [passwordHash, userId]);
 };
 
 // Safe Delete User (with Client Notification)
