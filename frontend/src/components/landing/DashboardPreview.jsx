@@ -7,7 +7,7 @@ export default function DashboardPreview() {
         <section className="w-full max-w-7xl px-6 pb-40 relative z-10">
             <div className="relative rounded-2xl p-2 glass-card-strong overflow-hidden group">
                 <Image
-                    src="/PagePreviewFullPage.webp"
+                    src="/PagePreviewFullPage.png"
                     alt="Dashboard"
                     width={1400} height={900}
                     className="rounded-xl w-full h-auto opacity-90 transition-opacity group-hover:opacity-100"
