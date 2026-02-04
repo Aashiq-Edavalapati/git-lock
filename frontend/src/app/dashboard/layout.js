@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, PlusCircle, 
   Settings, LogOut, FileCode, Menu, Bell, Mail,
-  ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, User 
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,27 +16,23 @@ const sidebarItems = [
   { icon: PlusCircle, label: "New Lock", href: "/dashboard/create" },
   { icon: FileCode, label: "My Contracts", href: "/dashboard/contracts" },
   { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [role, setRole] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Determine Role for sidebar filtering
-    const fetchRole = async () => {
+    // Determine Role for sidebar filtering and User for profile
+    const fetchUser = async () => {
         try {
-            // We can check localStorage or make a quick call. 
-            // Since this is layout, let's try reading from a lighter endpoint or just /auth/me
-            // Note: This might cause a delay in sidebar updating on first load, but acceptable for now.
             const { data } = await import("@/lib/api").then(m => m.default.get('/auth/me'));
-            setRole(data.role);
+            setUser(data);
         } catch(e) {}
     }
-    fetchRole();
+    fetchUser();
   }, []);
 
   return (
@@ -84,7 +80,7 @@ export default function DashboardLayout({ children }) {
         <nav className="flex-1 px-3 space-y-2 mt-4">
           {sidebarItems.map((item) => {
             // "New Lock" (PlusCircle) is only for DEVELOPER
-            if (item.label === "New Lock" && role !== "DEVELOPER") return null;
+            if (item.label === "New Lock" && user?.role !== "DEVELOPER") return null;
 
             const isActive = pathname === item.href;
             return (
@@ -116,17 +112,42 @@ export default function DashboardLayout({ children }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
+        <div className="p-4 border-t border-white/5 space-y-2">
+          
+          {/* Profile Circle Link */}
+          <Link href="/dashboard/settings">
+            <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group hover:bg-white/5 ${isSidebarCollapsed ? "justify-center" : ""}`}>
+               <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-black overflow-hidden relative">
+                  {user?.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                      user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />
+                  )}
+               </div>
+               
+               {!isSidebarCollapsed && (
+                 <motion.div 
+                   initial={{ opacity: 0 }}
+                   animate={{ opacity: 1 }}
+                   className="flex flex-col overflow-hidden"
+                 >
+                    <span className="font-medium text-sm text-white truncate">{user?.name || "User"}</span>
+                    <span className="text-xs text-gray-500 truncate">{user?.role || "Member"}</span>
+                 </motion.div>
+               )}
+            </div>
+          </Link>
+
           <button onClick={async () => {
               try {
                   await import("@/lib/api").then(m => m.default.post('/auth/logout'));
                   window.location.href = "/login";
               } catch(e) { console.error(e); }
-          }} className={`flex items-center gap-3 px-3 py-3 text-gray-400 hover:text-red-400 transition-colors w-full ${isSidebarCollapsed ? "justify-center" : ""}`}
+          }} className={`flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-red-400 transition-colors w-full ${isSidebarCollapsed ? "justify-center" : ""}`}
              title={isSidebarCollapsed ? "Sign Out" : ""}
           >
-            <LogOut size={20} />
-            {!isSidebarCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">Sign Out</span>}
+            <LogOut size={18} />
+            {!isSidebarCollapsed && <span className="font-medium text-sm whitespace-nowrap overflow-hidden">Sign Out</span>}
           </button>
         </div>
       </aside>
