@@ -16,7 +16,7 @@ In the freelance software world, there is a fundamental "Deadlock of Trust":
 
 ---
 
-### **2. The Workflow (The "Happy Path")**
+### **2. The Workflow (Solution)**
 
 This workflow is designed to be **immutable**. Once a version is locked, it cannot be secretly changed.
 
@@ -62,19 +62,14 @@ This workflow is designed to be **immutable**. Once a version is locked, it cann
 
 ### **3. Implementation Plan (Tech Stack)**
 
-You are using a pure JavaScript stack(Strictly No Typescript, Just plain Javascript) (MERN/PERN) optimized for this specific lab.
-
-* **Frontend:** Next.js (App Router), Tailwind CSS (for the "Cyber" aesthetic).
+* **Frontend:** Next.js (App Router), Tailwind CSS.
 * **Backend:** Express.js (Node.js).
 * **Database:** PostgreSQL (via Supabase).
 * **Integrations:**
-* **GitHub API (Octokit):** For fetching commits and deployment statuses.
-* **Google OAuth**: For Continue with Google while logging/signing up
-
-* **GitHub OAuth**: For Continue with GitHub while logging in/signing up
-* **Razorpay (Test Mode):** For simulating the payment gateway.
-
-
+  * **GitHub API (Octokit):** For fetching commits and deployment statuses.
+  * **Google OAuth**: For Continue with Google while logging/signing up
+  * **GitHub OAuth**: For Continue with GitHub while logging in/signing up
+  * **Razorpay (Test Mode):** For simulating the payment gateway.
 
 ---
 
