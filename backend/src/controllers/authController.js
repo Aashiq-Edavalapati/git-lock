@@ -10,6 +10,25 @@ import { generateToken } from '../utils/jwtService.js';
 // Standard recommended salt rounds for bcrypt is 10-12
 const SALT_ROUNDS = 10;
 
+// Helper to sync pending invites
+const syncPendingInvites = async (userId, email) => {
+    try {
+        // Find projects where email matches AND status is INVITE_SENT
+        const query = `SELECT * FROM projects WHERE developer_email = $1 AND status = 'INVITE_SENT'`;
+        const result = await pool.query(query, [email]);
+        
+        if (result.rows.length > 0) {
+            console.log(`[SYNC] Found ${result.rows.length} pending invites for ${email}`);
+            for (const project of result.rows) {
+                // Create Notification for each
+                await createNotification(userId, `You received an invitation for project "${project.title}"`, 'PROJECT', project.id, `/dashboard/accept-invite/${project.id}`);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to sync pending invites:", e);
+    }
+};
+
 export const register = async (req, res) => {
   try {
     const { email, fullName, password, role } = req.body;
@@ -33,6 +52,9 @@ export const register = async (req, res) => {
 
     // Save to DB
     await saveMFASecret(newUser.id, otpHash, expiry, 'REGISTER');
+    
+    // Sync Pending Invites
+    await syncPendingInvites(newUser.id, email);
     
     // console.log(`DEBUG ONLY: Generated OTP for ${email}: ${otp}`);
     await sendMFAEmail(email, otp);
@@ -188,6 +210,9 @@ export const githubLogin = async (req, res) => {
        
        // Send Welcome Email
        await sendWelcomeEmail(user.email, githubProfile.name);
+       
+       // Sync Pending Invites
+       await syncPendingInvites(user.id, user.email);
     }
 
     // Update their Github Token in DB
@@ -234,6 +259,9 @@ export const googleLogin = async (req, res) => {
        
        // Send Welcome Email
        await sendWelcomeEmail(user.email, googleProfile.name);
+       
+       // Sync Pending Invites
+       await syncPendingInvites(user.id, user.email);
     }
 
     // Update their Google Token in DB

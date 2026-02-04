@@ -83,35 +83,59 @@ export const getProject = async (req, res) => {
   }
 };
 
-// 1. Client Creates Project (Refined)
+
 export const initProject = async (req, res) => {
   try {
     const { title, description, budget, developerEmail, requirements, attachments } = req.body;
     const clientId = req.user.id; // From JWT
-    const clientEmail = req.user.email; // From JWT payload
+    const clientEmail = req.user.email;
 
-    // A. Validation: If dev email is provided, check if they are a real user?    
+    // A. Validation: If dev email is provided
+    let devUserId = null;
+    let isNewUser = false;
+
+    if (!developerEmail) {
+        return res.status(400).json({ error: 'Developer email is required' });
+    }
+
+    const developer = await findUserByEmail(developerEmail);
+    if (developer) {
+        // Check Role
+        if (developer.role !== 'DEVELOPER') {
+            return res.status(400).json({ error: 'User exists but is not a Developer. Only developers can be invited.' });
+        }
+        devUserId = developer.id;
+    } else {
+        isNewUser = true;
+    }
+
     // B. Create Project
     const status = developerEmail ? 'INVITE_SENT' : 'OPEN';
     const newProject = await createProject(title, description, budget, clientId, developerEmail || null, requirements || "", attachments || [], status);
 
     // C. Handle Invite Logic
-    if (developerEmail) {
-      await sendProjectInvite(developerEmail, clientEmail, title, budget);
+    if (!isNewUser) {
+        // Existing Developer -> Standard Invite
+        await sendProjectInvite(developerEmail, clientEmail, title, budget);
+            // In-App Notification (Only for existing user)
+        await createNotification(devUserId, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
+    } else {
+        // Non-Existing User -> Join Invite
+        const { sendJoinInviteEmail } = await import('../utils/emailService.js');
+        // We need client name
+        const client = await findUserById(clientId);
+        await sendJoinInviteEmail(developerEmail, client.full_name, title);
+        // No In-App Notification yet (will be created on registration)
     }
+    
 
-    // D. Notification
+    // D. Notification for Client
     await createNotification(clientId, `Project Created: ${title}`, 'PROJECT', newProject.id, `/dashboard/projects/${newProject.id}`);
 
-    if (developerEmail) {
-        const developer = await findUserByEmail(developerEmail);
-        if (developer) {
-            await createNotification(developer.id, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
-        }
-    }
-
     res.status(201).json({
-      message: developerEmail ? 'Project created and invite sent' : 'Project created (No developer invited yet)',
+      message: developerEmail 
+        ? (isNewUser ? 'Project created. Invite sent to join GitLock.' : 'Project created and invite sent to developer.') 
+        : 'Project created (No developer invited yet)',
       project: newProject
     });
 
@@ -127,6 +151,10 @@ export const inviteDeveloper = async (req, res) => {
     const { projectId, developerEmail, subject, body, requirements } = req.body;
     const clientId = req.user.id;
 
+    if (!developerEmail) {
+        return res.status(400).json({ error: 'Developer email is required' });
+    }
+
     // A. Authorization Check (Rubric #2: Access Control)
     const project = await findProjectById(projectId);
     
@@ -134,6 +162,21 @@ export const inviteDeveloper = async (req, res) => {
     
     if (project.client_id !== clientId) {
       return res.status(403).json({ error: 'Unauthorized: You are not the owner of this project' });
+    }
+
+    // A.5 Developer Validation
+    let devUserId = null;
+    let isNewUser = false;
+
+    const developer = await findUserByEmail(developerEmail);
+    if (developer) {
+        // Check Role
+        if (developer.role !== 'DEVELOPER') {
+            return res.status(400).json({ error: 'User exists but is not a Developer. Only developers can be invited.' });
+        }
+        devUserId = developer.id;
+    } else {
+        isNewUser = true;
     }
 
     // B. Handle Attachments
@@ -166,16 +209,27 @@ export const inviteDeveloper = async (req, res) => {
     const result = await pool.query(query, [developerEmail, projectId, requirements, JSON.stringify(attachments)]);
 
     // D. Send Email
-    await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
-
-    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
-    
-    const developer = await findUserByEmail(developerEmail);
-    if (developer) {
-        await createNotification(developer.id, `You received an invitation for project "${project.title}"`, 'PROJECT', projectId, `/dashboard/accept-invite/${projectId}`);
+    if (!isNewUser) {
+        // Standard User
+         await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
+         // Notification
+         await createNotification(devUserId, `You received an invitation for project "${project.title}"`, 'PROJECT', projectId, `/dashboard/accept-invite/${projectId}`);
+    } else {
+         // Non-User
+         const { sendJoinInviteEmail } = await import('../utils/emailService.js');
+         // Need client name (req.user from middleware usually has id/email, fetch from DB to be safe or use what we updated in middleware if available)
+         // Assuming req.user only has jwt payload, safe to fetch
+         const client = await findUserById(clientId);
+         await sendJoinInviteEmail(developerEmail, client.full_name, project.title);
     }
+ 
+    // Notify Client
+    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
 
-    res.status(200).json({ message: 'Invite sent successfully', project: result.rows[0] });
+    res.status(200).json({ 
+        message: isNewUser ? 'Invite sent to join GitLock' : 'Invite sent successfully', 
+        project: result.rows[0] 
+    });
 
   } catch (error) {
     console.error(error);

@@ -165,3 +165,30 @@ export const sendWelcomeEmail = async (email, fullName) => {
     console.error('❌ Welcome Email failed:', error);
   }
 };
+
+export const sendJoinInviteEmail = async (email, clientName, projectTitle) => {
+  const htmlContent = `
+    <p>Hello,</p>
+    <p><strong>${clientName}</strong> has invited you to work on their project <strong>"${projectTitle}"</strong> on GitLock.</p>
+    <p>GitLock is a secure platform for developers and clients to collaborate with escrow-based payments.</p>
+    <p>To view the project details and accept the invitation, please create a developer account using the link below:</p>
+    <div style="text-align: center;">
+      <a href="http://localhost:3000/register?role=DEVELOPER&email=${email}" class="btn">Join GitLock</a>
+    </div>
+    <p>If you already have an account, please log in.</p>
+  `;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: `Invitation to join GitLock for "${projectTitle}"`,
+    html: getEmailTemplate('Project Invitation', htmlContent),
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Join Invite Email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Join Invite Email failed:', error);
+  }
+};
