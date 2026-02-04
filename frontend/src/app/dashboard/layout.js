@@ -18,10 +18,20 @@ const sidebarItems = [
   { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
 ];
 
+import { SidebarProvider, useSidebar } from "@/context/SidebarContext";
+
 export default function DashboardLayout({ children }) {
+  return (
+    <SidebarProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </SidebarProvider>
+  );
+}
+
+function DashboardContent({ children }) {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -119,6 +129,7 @@ export default function DashboardLayout({ children }) {
             <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group hover:bg-white/5 ${isSidebarCollapsed ? "justify-center" : ""}`}>
                <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-black overflow-hidden relative">
                   {user?.avatarUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                       user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />
