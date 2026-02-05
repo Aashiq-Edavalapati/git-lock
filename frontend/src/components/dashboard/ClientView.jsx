@@ -2,17 +2,21 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, UserPlus, FileCode, CheckCircle2, Loader2, ArrowRight, Lock, Unlock, Edit, Trash2 } from "lucide-react";
+import { Plus, UserPlus, FileCode, CheckCircle2, Loader2, ArrowRight, Lock, Unlock, Edit, Trash2, LayoutDashboard, History } from "lucide-react";
 import Button from "@/components/ui/Button";
 import api from "@/lib/api";
 import Notifications from "./Notifications";
+import PaymentHistoryTable from "./PaymentHistoryTable";
 
 import ConfirmationModal from "./ConfirmationModal";
 import CreateProjectModal from "./CreateProjectModal";
 import ErrorModal from "./ErrorModal";
 
 export default function ClientView() {
+  const [activeTab, setActiveTab] = useState("projects");
   const [projects, setProjects] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newProject, setNewProject] = useState({ title: "", budget: "" });
 
@@ -27,6 +31,16 @@ export default function ClientView() {
   useEffect(() => {
     refreshProjects();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'payments' && payments.length === 0) {
+      setLoadingPayments(true);
+      api.get('/payments/history')
+        .then(res => setPayments(res.data))
+        .catch(console.error)
+        .finally(() => setLoadingPayments(false));
+    }
+  }, [activeTab]);
 
   const refreshProjects = () => {
     api.get('/projects').then(res => setProjects(res.data)).catch(console.error);
@@ -80,17 +94,41 @@ export default function ClientView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {projects.length === 0 ? <div className="p-12 text-center text-gray-500 border border-dashed border-white/10 rounded-xl">No projects found.</div> :
-          projects.map(p => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onDelete={() => confirmDelete(p)}
-            />
-          ))
-        }
+      {/* Tabs */}
+      <div className="flex space-x-1 rounded-xl bg-white/5 p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("projects")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "projects" ? "bg-primary/20 text-primary shadow" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+        >
+          <LayoutDashboard size={16} /> Projects
+        </button>
+        <button
+          onClick={() => setActiveTab("payments")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "payments" ? "bg-primary/20 text-primary shadow" : "text-gray-400 hover:text-white hover:bg-white/5"}`}
+        >
+          <History size={16} /> Payment History
+        </button>
       </div>
+
+      {activeTab === 'projects' ? (
+        <div className="grid grid-cols-1 gap-4 text-white">
+          {projects.length === 0 ? <div className="p-12 text-center text-gray-500 border border-dashed border-white/10 rounded-xl">No projects found.</div> :
+            projects.map(p => (
+              <ProjectCard
+                key={p.id}
+                project={p}
+                onDelete={() => confirmDelete(p)}
+              />
+            ))
+          }
+        </div>
+      ) : (
+        <div className="glass-card p-6 rounded-xl border border-white/10">
+          {loadingPayments ? <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-white" /></div> :
+            <PaymentHistoryTable payments={payments} role="CLIENT" />
+          }
+        </div>
+      )}
 
       {/* Create Project Modal */}
       <CreateProjectModal

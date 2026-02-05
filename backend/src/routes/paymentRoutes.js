@@ -1,6 +1,7 @@
 import express from 'express';
 import { createOrder, verifyAndUnlock, getRazorpayKey } from '../controllers/paymentController.js';
-import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
+import { authenticateToken, requireRole, checkAcl } from '../middleware/authMiddleware.js';
+import { getPaymentLogs } from '../controllers/auditController.js';
 
 const router = express.Router();
 
@@ -13,5 +14,11 @@ router.get('/key', authenticateToken, getRazorpayKey);
 // 2. Verify Signature & Download File (Client Only + MFA Check)
 // TODO: Check if MFA was recently verified. 
 router.post('/unlock', authenticateToken, requireRole('CLIENT'), verifyAndUnlock);
+
+/*
+ * ACL: PAYMENT LOGS
+ * Global History for User (Client/Dev/Admin)
+ */
+router.get('/history', authenticateToken, checkAcl('PAYMENT_LOGS', 'READ'), getPaymentLogs);
 
 export default router;

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import ClientView from "@/components/dashboard/ClientView";
 import DeveloperView from "@/components/dashboard/DeveloperView";
+import AdminView from "@/components/dashboard/AdminView";
 import api from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
@@ -36,7 +37,7 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-in fade-in duration-500">
-       {role === "DEVELOPER" ? <DeveloperView /> : <ClientView />}
+       {role === "ADMIN" ? <AdminView /> : role === "DEVELOPER" ? <DeveloperView /> : <ClientView />}
     </div>
   );
 }

@@ -127,13 +127,55 @@ export const verifyAndUnlock = async (req, res) => {
     if(project) {
         await createNotification(project.client_id, `Payment Successful. Project "${project.title}" Unlocked.`, 'PAYMENT', projectId, `/dashboard/escrow/${projectId}`);
         await createNotification(project.developer_id, `Payment Secured in Escrow for "${project.title}". Code Released.`, 'PAYMENT', projectId, `/dashboard/escrow/${projectId}`);
-    }
 
+        // --- ACL REQUIREMENT: PAYMENT LOG ---
+        // Log this action in audit_logs so it appears in Payment Logs
+        // user_id = Client (who paid)
+        const paymentDetails = {
+            projectId: project.id,
+            projectTitle: project.title,
+            amount: razorpay_order_id, // Or fetching actual amount if available, keeping it simple
+            paymentId: razorpay_payment_id
+        };
+        
+        await client.query(
+            `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+            [project.client_id, 'PAYMENT', JSON.stringify(paymentDetails)]
+        );
+    }
+    
     res.status(200).json({ success: true, message: "Payment Verified & Project Unlocked" });
 
   } catch (error) {
     await client.query('ROLLBACK');
     console.error(error);
+    
+    // Log Failure
+    try {
+        // We need to extract what we can. 
+        // Note: client (transaction) is rolled back, so audit log must be a separate query/connection or outside transaction?
+        // Actually, if we rollback, any insert in that transaction is gone.
+        // So we must use a fresh query to log the failure.
+        
+        // Get user ID from req.user if available (authenticateToken should have set it)
+        const userId = req.user?.id; 
+        const { projectId, razorpay_payment_id } = req.body;
+        
+        if (userId && projectId) {
+             const paymentDetails = {
+                projectId: projectId,
+                error: error.message,
+                paymentId: razorpay_payment_id || 'UNKNOWN'
+            };
+             await pool.query(
+                `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+                [userId, 'PAYMENT_FAILED', JSON.stringify(paymentDetails)]
+            );
+        }
+    } catch (logErr) {
+        console.error("Failed to log payment error:", logErr);
+    }
+
     res.status(500).json({ error: 'Unlock Failed' });
   } finally {
     client.release();

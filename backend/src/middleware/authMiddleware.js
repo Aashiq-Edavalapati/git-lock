@@ -19,6 +19,54 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
+// --- ACCESS CONTROL MATRIX ---
+const ACL_MATRIX = {
+    // 1. PROJECT DETAILS
+    'PROJECT_DETAILS': {
+        'CLIENT': ['CREATE', 'READ'],
+        'DEVELOPER': ['READ', 'ACCEPT'],
+        'ADMIN': ['READ'] // Audit
+    },
+    // 2. SOURCE CODE
+    'SOURCE_CODE': {
+        'CLIENT': ['READ'], // Logic inside controller handles "only after unlock"
+        'DEVELOPER': ['UPLOAD', 'READ'], 
+        'ADMIN': [] // No Access (Privacy)
+    },
+    // 3. PAYMENT LOGS
+    'PAYMENT_LOGS': {
+        'CLIENT': ['CREATE', 'READ'],
+        'DEVELOPER': ['READ'], // Access to own earnings
+        'ADMIN': ['READ'] // Audit
+    }
+};
+
+export const checkAcl = (resource, action) => {
+    return (req, res, next) => {
+        const userRole = req.user?.role;
+
+        if (!userRole) {
+            return res.status(403).json({ error: 'Access Denied: No Role' });
+        }
+
+        // Check if resource exists in matrix
+        if (!ACL_MATRIX[resource]) {
+            console.error(`ACL Error: Resource ${resource} not defined`);
+            return res.status(500).json({ error: 'Internal ACL Error' });
+        }
+
+        const allowedActions = ACL_MATRIX[resource][userRole] || [];
+
+        if (allowedActions.includes(action)) {
+            next();
+        } else {
+            return res.status(403).json({ 
+                error: `Access Denied: role '${userRole}' cannot perform '${action}' on '${resource}'.` 
+            });
+        }
+    };
+};
+
 export const requireRole = (role) => {
   return (req, res, next) => {
     if (req.user.role !== role) {
