@@ -94,19 +94,17 @@ export const initProject = async (req, res) => {
     let devUserId = null;
     let isNewUser = false;
 
-    if (!developerEmail) {
-        return res.status(400).json({ error: 'Developer email is required' });
-    }
-
-    const developer = await findUserByEmail(developerEmail);
-    if (developer) {
-        // Check Role
-        if (developer.role !== 'DEVELOPER') {
-            return res.status(400).json({ error: 'User exists but is not a Developer. Only developers can be invited.' });
+    if (developerEmail) {
+        const developer = await findUserByEmail(developerEmail);
+        if (developer) {
+            // Check Role
+            if (developer.role !== 'DEVELOPER') {
+                return res.status(400).json({ error: 'User exists but is not a Developer. Only developers can be invited.' });
+            }
+            devUserId = developer.id;
+        } else {
+            isNewUser = true;
         }
-        devUserId = developer.id;
-    } else {
-        isNewUser = true;
     }
 
     // B. Create Project
@@ -114,20 +112,21 @@ export const initProject = async (req, res) => {
     const newProject = await createProject(title, description, budget, clientId, developerEmail || null, requirements || "", attachments || [], status);
 
     // C. Handle Invite Logic
-    if (!isNewUser) {
-        // Existing Developer -> Standard Invite
-        await sendProjectInvite(developerEmail, clientEmail, title, budget);
-            // In-App Notification (Only for existing user)
-        await createNotification(devUserId, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
-    } else {
-        // Non-Existing User -> Join Invite
-        const { sendJoinInviteEmail } = await import('../utils/emailService.js');
-        // We need client name
-        const client = await findUserById(clientId);
-        await sendJoinInviteEmail(developerEmail, client.full_name, title);
-        // No In-App Notification yet (will be created on registration)
+    if (developerEmail) {
+        if (!isNewUser) {
+            // Existing Developer -> Standard Invite
+            await sendProjectInvite(developerEmail, clientEmail, title, budget);
+                // In-App Notification (Only for existing user)
+            await createNotification(devUserId, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
+        } else {
+            // Non-Existing User -> Join Invite
+            const { sendJoinInviteEmail } = await import('../utils/emailService.js');
+            // We need client name
+            const client = await findUserById(clientId);
+            await sendJoinInviteEmail(developerEmail, client.full_name, title);
+            // No In-App Notification yet (will be created on registration)
+        }
     }
-    
 
     // D. Notification for Client
     await createNotification(clientId, `Project Created: ${title}`, 'PROJECT', newProject.id, `/dashboard/projects/${newProject.id}`);
@@ -470,18 +469,44 @@ export const uploadCode = async (req, res) => {
     console.log("✅ Deployment Verified.");
 
     // Proceed with Encryption
-    const encryptedData = encryptBuffer(req.file.buffer);
+    // 1. Fetch Client's Public Key (The owner of the project)
+    // We need to fetch the project again to be sure (or use the check above if we had client_id)
+    // The project object was not fetched in this function yet (except implicitly via validation?)
+    // Actually we haven't fetched 'project' yet in this function. We need to.
+    
+    // We already need project_id to save version.
+    const project = await findProjectById(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    const clientUser = await findUserById(project.client_id);
+    const clientPublicKey = clientUser?.public_key;
+
+    let encryptedData;
+    let encryptedKey = null;
+
+    if (clientPublicKey) {
+        console.log("🔐 Using Hybrid Encryption (RSA + AES)");
+         // Dynamic Import to avoid circular dep if needed, but we used standard import at top
+        const { encryptHybrid } = await import('../utils/cryptoService.js');
+        const hybridResult = encryptHybrid(req.file.buffer, clientPublicKey);
+        
+        encryptedData = hybridResult.encryptedFile;
+        encryptedKey = hybridResult.encryptedKey;
+    } else {
+        console.warn("⚠️ Client has no Public Key. Falling back to Server-Side Encryption.");
+        encryptedData = encryptBuffer(req.file.buffer);
+    }
     
     const finalHash = generateFileHash(req.file.buffer);
 
     const readmeEntry = githubZip.getEntries().find(e => e.entryName.toLowerCase().endsWith('readme.md'));
     const readmeBase64 = readmeEntry ? readmeEntry.getData().toString('base64') : null;
 
-    await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl, readmeBase64);
+    await saveProjectVersion(projectId, encryptedData, finalHash, stagingUrl, commitSha, repoUrl, readmeBase64, encryptedKey);
     await updateProjectStatus(projectId, 'LOCKED_REVIEW');
 
     // Notification Logic
-    const project = await findProjectById(projectId);
+    // Project was already fetched above as 'project'
     const cleanStagingUrl = stagingUrl ? stagingUrl.replace(/\/$/, "") : stagingUrl;
     
     const notificationMsg = `
@@ -613,25 +638,47 @@ export const downloadCode = async (req, res) => {
         }
 
         // Get Version
-        const versionQuery = `SELECT encrypted_blob FROM project_versions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1`;
+        const versionQuery = `SELECT encrypted_blob, encrypted_aes_key FROM project_versions WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1`;
         const versionResult = await pool.query(versionQuery, [id]);
         
         if (versionResult.rows.length === 0) return res.status(404).json({ error: 'No code found' });
 
-        const { encrypted_blob } = versionResult.rows[0];
+        const { encrypted_blob, encrypted_aes_key } = versionResult.rows[0];
         
-        // Decrypt dynamically
-        const { decryptBuffer } = await import('../utils/cryptoService.js');
+        // HYBRID ENCRYPTION CHECK
+        if (encrypted_aes_key) {
+            console.log("🔓 Serving Hybrid Encrypted File (Client-Side Decryption)");
+            
+            // Return the Encrypted AES Key in Header
+            res.set({
+                'Content-Type': 'application/zip', // Browser treats as zip, but it's actually encrypted stream. Client JS must handle.
+                'Content-Disposition': `attachment; filename="project_${id}_encrypted.gitlock"`, // Custom extension to hint need for decryption
+                'X-GitLock-Key': encrypted_aes_key, // The Key needed to decrypt
+                'Access-Control-Expose-Headers': 'X-GitLock-Key' // Important for CORS if needed
+            });
+            
+            // Check if encrypted_blob is Buffer or String (Postgres BYTEA vs TEXT)
+            // If stored as TEXT in DB (from our previous update), it's the hex string "iv:data"
+            // We should send it as is.
+            res.send(encrypted_blob); 
+            
+        } else {
+            console.log("🔓 Legacy Decryption (Server-Side)");
+            // Legacy / Fallback: Decrypt on Server
+            const { decryptBuffer } = await import('../utils/cryptoService.js');
 
-        const encryptedString = encrypted_blob.toString('utf-8');
-        const decryptedBuffer = decryptBuffer(encryptedString);
+            const encryptedString = encrypted_blob.toString('utf-8');
+            const decryptedBuffer = decryptBuffer(encryptedString);
 
-        res.set({
-            'Content-Type': 'application/zip',
-            'Content-Disposition': `attachment; filename="project_${id}_source.zip"`,
-            'Content-Length': decryptedBuffer.length
-        });
-        res.send(decryptedBuffer);
+            res.set({
+                'Content-Type': 'application/zip',
+                'Content-Disposition': `attachment; filename="project_${id}_source.zip"`,
+                'Content-Length': decryptedBuffer.length
+            });
+            res.send(decryptedBuffer);
+        }
+
+
 
     } catch (err) {
         console.error(err);

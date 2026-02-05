@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP, forgotPassword, resetPassword, initiateChangePassword, finalizeChangePassword, resendLoginOTP } from '../controllers/authController.js';
+import { register, login, verifyMFA, getMe, githubLogin, googleLogin, logout, connectGithubAccount, updateProfile, deleteAccount, initiateDeleteAccount, requestOTP, forgotPassword, resetPassword, initiateChangePassword, finalizeChangePassword, resendLoginOTP, setPublicKey } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -25,5 +25,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/change-password/initiate', authenticateToken, initiateChangePassword);
 router.post('/change-password/finalize', authenticateToken, finalizeChangePassword);
+
+router.post('/public-key', authenticateToken, setPublicKey);
 
 export default router;

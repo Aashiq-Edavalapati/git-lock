@@ -2,12 +2,14 @@
 
 import { use, useState, useEffect } from "react";
 import api from "@/lib/api";
-import { ShieldCheck, Download, Lock, AlertTriangle, RefreshCw } from "lucide-react";
+import { ShieldCheck, Download, Lock, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import LockRequestModal from "@/components/dashboard/LockRequestModal";
 import SuccessModal from "@/components/dashboard/SuccessModal";
 import ErrorModal from "@/components/dashboard/ErrorModal";
 import AcceptInviteModal from "@/components/dashboard/AcceptInviteModal";
+// Import Crypto
+import { decryptHybrid } from "@/utils/crypto";
 
 export default function EscrowPage({ params }) {
   const { id } = use(params);
@@ -16,6 +18,7 @@ export default function EscrowPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Advanced Lock State
   const [lockRequests, setLockRequests] = useState([]);
@@ -26,6 +29,62 @@ export default function EscrowPage({ params }) {
   // Modals
   const [successModal, setSuccessModal] = useState({ open: false, title: "", message: "" });
   const [errorModal, setErrorModal] = useState({ open: false, title: "", message: "" });
+
+  // Correct Download Handler with Client-Side Decryption
+  const handleSecureDownload = async () => {
+      try {
+          setIsDownloading(true);
+          console.log("⬇️ Fetching Encrypted Code...");
+          
+          const response = await api.get(`/projects/${project.id}/download`, {
+              responseType: 'text', // We expect the "iv:data" string
+          });
+
+          const encryptedKey = response.headers['x-gitlock-key'];
+          const encryptedPayload = response.data; // This is the "iv:data" string
+
+          if (encryptedKey) {
+              console.log("🔐 Hybrid Encryption Detected. Decrypting...");
+              
+              // Get Private Key
+              const privateKeyPem = localStorage.getItem('gitlock_private_key');
+              if (!privateKeyPem) {
+                  alert("Private Key not found! You cannot decrypt this file without your Private Key.");
+                  return;
+              }
+
+              // Decrypt
+              // encryptedPayload (String "iv:hex") -> ArrayBuffer (Zip)
+              const decryptedArrayBuffer = await decryptHybrid(encryptedPayload, encryptedKey, privateKeyPem);
+              
+              // Create Download Blob
+              const blob = new Blob([decryptedArrayBuffer], { type: 'application/zip' });
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.setAttribute('download', `project_${project.id}_source.zip`);
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              console.log("✅ Download & Decryption Complete");
+
+          } else {
+              // Legacy/Plain Download (Fallback)
+              // Since we requested 'text', we might format data wrongly if it was binary.
+              // Safest fallback is direct window.open if headers missing
+              // Or try to parse blob?
+              console.log("🔓 Legacy Download (Redirecting)");
+               window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`);
+          }
+
+      } catch (err) {
+          console.error("Download Failed:", err);
+          setErrorModal({ open: true, title: "Download Error", message: "Failed to download or decrypt file." });
+      } finally {
+          setIsDownloading(false);
+      }
+  };
+
 
   // Helper to get Razorpay
   const loadRazorpay = () => {
@@ -69,7 +128,7 @@ export default function EscrowPage({ params }) {
   if (loading) return <div className="p-20 text-center text-white">Loading Vault...</div>;
 
 
-  const isDev = currentUser.role === 'DEVELOPER';
+  const isDev = currentUser?.role === 'DEVELOPER';
   const isPaid = project.status === 'COMPLETED';
   const canViewFiles = isDev || isPaid;
 
@@ -175,7 +234,7 @@ export default function EscrowPage({ params }) {
                         open: true, 
                         title: "Payment Successful", 
                         message: "The budget has been released and the code is now unlocked!",
-                        onAction: () => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`, '_blank'),
+                        onAction: handleSecureDownload,
                         actionLabel: "Download Code"
                     });
                     
@@ -291,10 +350,15 @@ export default function EscrowPage({ params }) {
                     
                     
                     <Button 
-                        onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL||'http://localhost:5000/api'}/projects/${project.id}/download`)}
+                        onClick={handleSecureDownload}
                         className="mx-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3"
+                        disabled={isDownloading}
                     >
-                        <Download className="mr-2" size={20}/> Download Source Code
+                        {isDownloading ? (
+                            <><Loader2 className="animate-spin mr-2" size={20}/> Decrypting...</>
+                        ) : (
+                            <><Download className="mr-2" size={20}/> Download Source Code</>
+                        )}
                     </Button>
 
                     <div className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-2">

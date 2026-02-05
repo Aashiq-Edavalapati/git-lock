@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db.js';
-import { createUser, deleteUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret, getResetSecret, clearResetSecret, updateUserPassword } from '../models/userModel.js';
+import { createUser, findUserByEmail, findUserById, saveMFASecret, getMFASecret, clearMFASecret, updateUserProfile, saveResetSecret, getResetSecret, clearResetSecret, updateUserPassword, deleteUser, updateUserPublicKey } from '../models/userModel.js';
 import { getGithubToken, getGithubUser, getGoogleToken, getGoogleUser } from '../services/oauthService.js';
 import { createNotification } from '../models/notificationModel.js';
 import { sendMFAEmail, sendWelcomeEmail } from '../utils/emailService.js';
@@ -582,4 +582,20 @@ export const finalizeChangePassword = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: 'Failed to change password' });
     }
+};
+// Update Public Key (For Social Login users mainly)
+export const setPublicKey = async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    const userId = req.user.id;
+
+    if (!publicKey) return res.status(400).json({ error: 'Public Key is required' });
+
+    await updateUserPublicKey(userId, publicKey);
+
+    res.json({ message: 'Public Key updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update public key' });
+  }
 };

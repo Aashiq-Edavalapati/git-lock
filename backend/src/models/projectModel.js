@@ -17,15 +17,16 @@ export const findProjectById = async (id) => {
 };
 
 // Upload Encrypted Code (The Lock)
-export const saveProjectVersion = async (projectId, encryptedBlob, zipHash, stagingUrl, commitSha, repoUrl, readmeBase64) => {
+// Upload Encrypted Code (The Lock)
+export const saveProjectVersion = async (projectId, encryptedBlob, zipHash, stagingUrl, commitSha, repoUrl, readmeBase64, encryptedAesKey = null) => {
   // TODO: Add readme_preview column to DB. we will autocreate it in index.js
   const query = `
-    INSERT INTO project_versions (project_id, encrypted_blob, zip_hash, staging_url, commit_sha, repo_url, readme_preview)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO project_versions (project_id, encrypted_blob, zip_hash, staging_url, commit_sha, repo_url, readme_preview, encrypted_aes_key)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING id, created_at;
   `;
   
-  const result = await pool.query(query, [projectId, encryptedBlob, zipHash, stagingUrl, commitSha, repoUrl, readmeBase64]);
+  const result = await pool.query(query, [projectId, encryptedBlob, zipHash, stagingUrl, commitSha, repoUrl, readmeBase64, encryptedAesKey]);
   return result.rows[0];
 };
 

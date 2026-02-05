@@ -52,6 +52,33 @@ function CallbackHandler({ provider }) {
                     role: storedRole // Pass the role to backend
                 });
                 
+                const user = res.data.user;
+
+                // --- KEY GENERATION FIX FOR SOCIAL LOGIN ---
+                if (!user.public_key) {
+                    setStatus("Generating Encryption Keys...");
+                    const { generateKeyPair } = await import('@/utils/crypto');
+                    const keys = await generateKeyPair();
+                    
+                    // 1. Download Private Key
+                    const blob = new Blob([keys.privateKeyPem], { type: "application/x-pem-file" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `gitlock_private_key_${Date.now()}.pem`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // 2. Save Private Key to LocalStorage
+                    localStorage.setItem("gitlock_private_key", keys.privateKeyPem);
+
+                    // 3. Upload Public Key
+                    setStatus("Uploading Public Key...");
+                    await api.post('/auth/public-key', { publicKey: keys.publicKeyPem });
+                }
+                // -------------------------------------------
+                
                 console.log("Login Success", res.data);
                 // Redirect to dashboard
                 window.location.href = "/dashboard";

@@ -13,6 +13,7 @@ import OTPInput from "@/components/ui/OTPInput";
 import ResendOTP from "@/components/ui/ResendOTP";
 import api from "@/lib/api";
 import useAuthRedirect from "@/hooks/useAuthRedirect";
+import { generateKeyPair } from "@/utils/crypto";
 
 // Environment Helpers
 const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
@@ -30,6 +31,8 @@ export default function RegisterPage() {
 
   if (authLoading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
+  // Import Crypto Utility
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -42,11 +45,29 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+        // 1. Generate RSA Key Pair (Client-Side)
+        const { publicKeyPem, privateKeyPem } = await generateKeyPair();
+
+        // 2. Save Private Key to LocalStorage (For ease of use in this prototype)
+        localStorage.setItem("gitlock_private_key", privateKeyPem);
+
+        // 3. Trigger Download of Private Key (User ownership)
+        const blob = new Blob([privateKeyPem], { type: 'application/x-pem-file' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gitlock_private_key_${Date.now()}.pem`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // 4. Send Public Key to Backend
         const res = await api.post('/auth/register', {
             fullName: formData.fullName,
             email: formData.email,
             password: formData.password,
-            role: formData.role
+            role: formData.role,
+            publicKey: publicKeyPem 
         });
 
         if (res.data.mfaRequired) {
@@ -56,6 +77,7 @@ export default function RegisterPage() {
              router.push('/login?message=Account created successfully. Please login.');
         }
     } catch (err) {
+        console.error(err);
         setError(err.response?.data?.error || "Registration Failed");
     } finally {
         setIsLoading(false);

@@ -2,13 +2,14 @@ import pool from '../config/db.js';
 
 // Create a new user
 // Create a new user
-export const createUser = async (email, fullName, passwordHash, role, avatarUrl) => {
+// Create a new user
+export const createUser = async (email, fullName, passwordHash, role, avatarUrl, publicKey) => {
   const query = `
-    INSERT INTO users (email, full_name, password_hash, role, avatar_url)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO users (email, full_name, password_hash, role, avatar_url, public_key)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING id, email, role, created_at, avatar_url;
   `;
-  const values = [email, fullName, passwordHash, role, avatarUrl || null];
+  const values = [email, fullName, passwordHash, role, avatarUrl || null, publicKey || null];
   
   const result = await pool.query(query, values);
   return result.rows[0];
@@ -23,7 +24,7 @@ export const findUserByEmail = async (email) => {
 
 // Find user by ID (for MFA verification/Token generation)
 export const findUserById = async (id) => {
-  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url, password_hash FROM users WHERE id = $1`;
+  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url, password_hash, public_key FROM users WHERE id = $1`;
   const result = await pool.query(query, [id]);
   return result.rows[0];
 };
@@ -80,6 +81,12 @@ export const clearResetSecret = async (userId) => {
 export const updateUserPassword = async (userId, passwordHash) => {
   const query = `UPDATE users SET password_hash = $1 WHERE id = $2`;
   await pool.query(query, [passwordHash, userId]);
+};
+
+// Update User Public Key
+export const updateUserPublicKey = async (userId, publicKey) => {
+  const query = `UPDATE users SET public_key = $1 WHERE id = $2`;
+  await pool.query(query, [publicKey, userId]);
 };
 
 // Safe Delete User (with Client Notification)
