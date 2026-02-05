@@ -60,6 +60,16 @@ export const checkAcl = (resource, action) => {
         if (allowedActions.includes(action)) {
             next();
         } else {
+             // Log Unauthorized Access Attempt
+             const userId = req.user.id;
+             // Using fire-and-forget for logging to not block response
+             import('../config/db.js').then(({ default: pool }) => {
+                pool.query(
+                    `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+                    [userId, 'UNAUTHORIZED_ACCESS', JSON.stringify({ resource, action, role: userRole, ip: req.ip })]
+                ).catch(err => console.error("Failed to log unauthorized access", err));
+             });
+
             return res.status(403).json({ 
                 error: `Access Denied: role '${userRole}' cannot perform '${action}' on '${resource}'.` 
             });

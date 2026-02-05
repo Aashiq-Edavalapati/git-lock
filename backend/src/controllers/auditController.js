@@ -57,3 +57,79 @@ export const getPaymentLogs = async (req, res) => {
         res.status(500).json({ error: "Failed to retrieve payment logs" });
     }
 };
+
+export const getAdminStats = async (req, res) => {
+    try {
+        // 1. Intrusion Detection (Last 24 Hours)
+        // Group by hour to allow graph plotting
+        const intrusionQuery = `
+            SELECT 
+                date_trunc('hour', timestamp) as hour,
+                COUNT(*) as count
+            FROM audit_logs 
+            WHERE action IN ('LOGIN_FAILED', 'UNAUTHORIZED_ACCESS') 
+            AND timestamp > NOW() - INTERVAL '24 hours'
+            GROUP BY 1
+            ORDER BY 1 ASC
+        `;
+        const intrusionRes = await pool.query(intrusionQuery);
+
+        // 2. Escrow Vault Status
+        // Compare Locked vs Released amounts
+        const escrowQuery = `
+            SELECT 
+                COALESCE(SUM(budget) FILTER (WHERE status = 'LOCKED_REVIEW'), 0) as locked_funds,
+                COALESCE(SUM(budget) FILTER (WHERE status = 'COMPLETED'), 0) as released_funds
+            FROM projects
+        `;
+        const escrowRes = await pool.query(escrowQuery);
+
+        // 3. User Risk Scoring
+        const riskQuery = `
+            SELECT 
+                u.email,
+                u.full_name,
+                COUNT(*) FILTER (WHERE al.action = 'LOGIN_FAILED') * 10 +
+                COUNT(*) FILTER (WHERE al.action = 'UNAUTHORIZED_ACCESS') * 50 as risk_score
+            FROM users u
+            JOIN audit_logs al ON u.id = al.user_id
+            WHERE al.timestamp > NOW() - INTERVAL '7 days'
+            GROUP BY u.id
+            HAVING (COUNT(*) FILTER (WHERE al.action = 'LOGIN_FAILED') * 10 + COUNT(*) FILTER (WHERE al.action = 'UNAUTHORIZED_ACCESS') * 50) > 0
+            ORDER BY risk_score DESC
+            LIMIT 10
+        `;
+        const riskRes = await pool.query(riskQuery);
+
+        // 4. Activity Distribution (For Pie Chart)
+        const distQuery = `
+            SELECT action, COUNT(*) as count 
+            FROM audit_logs 
+            WHERE timestamp > NOW() - INTERVAL '30 days'
+            GROUP BY action
+        `;
+        const distRes = await pool.query(distQuery);
+
+        // 5. Recent Activity Log (For Table)
+        const recentQuery = `
+            SELECT al.*, u.email, u.full_name 
+            FROM audit_logs al
+            LEFT JOIN users u ON al.user_id = u.id
+            ORDER BY al.timestamp DESC
+            LIMIT 50
+        `;
+        const recentRes = await pool.query(recentQuery);
+
+        res.json({
+            intrusionGraph: intrusionRes.rows,
+            escrowStats: escrowRes.rows[0],
+            riskTable: riskRes.rows,
+            activityDistribution: distRes.rows,
+            recentActivity: recentRes.rows
+        });
+
+    } catch (e) {
+        console.error("Admin Stats Error:", e);
+        res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+};

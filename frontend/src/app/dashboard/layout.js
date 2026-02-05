@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, PlusCircle, 
   Settings, LogOut, FileCode, Menu, Bell, Mail,
-  ChevronLeft, ChevronRight, User 
+  ChevronLeft, ChevronRight, User, FileText, DollarSign 
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const sidebarItems = [
@@ -23,13 +23,16 @@ import { SidebarProvider, useSidebar } from "@/context/SidebarContext";
 export default function DashboardLayout({ children }) {
   return (
     <SidebarProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <Suspense fallback={<div className="w-64 h-screen bg-[#050505] animate-pulse" />}>
+        <DashboardContent>{children}</DashboardContent>
+      </Suspense>
     </SidebarProvider>
   );
 }
 
 function DashboardContent({ children }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
   const [user, setUser] = useState(null);
@@ -90,66 +93,119 @@ function DashboardContent({ children }) {
         </div>
 
         <nav className="flex-1 px-3 space-y-2 mt-4">
-          {sidebarItems.map((item) => {
-            // "New Lock" (PlusCircle) is only for DEVELOPER
-            if (item.label === "New Lock" && user?.role !== "DEVELOPER") return null;
+          {user?.role === "ADMIN" ? (
+             // --- ADMIN SIDEBAR ITEMS ---
+             [
+               { icon: LayoutDashboard, label: "Overview", href: "/dashboard", tab: null },
+               { icon: FileText, label: "Activity Log", href: "/dashboard?tab=activity", tab: "activity" },
+               { icon: DollarSign, label: "Payments", href: "/dashboard?tab=payments", tab: "payments" },
+               { icon: Settings, label: "Settings", href: "/dashboard/settings", tab: null } 
+             ].map((item) => {
+                
+                let isActive = false;
+                if (item.href === "/dashboard" && !item.tab) {
+                    // Exact match for Overview (no tab param)
+                    isActive = pathname === "/dashboard" && !searchParams.get("tab");
+                } else if (item.tab) {
+                    // Match tab param
+                    isActive = pathname === "/dashboard" && searchParams.get("tab") === item.tab;
+                } else {
+                    // Standard path match for settings
+                    isActive = pathname === item.href;
+                }
 
-            const isActive = pathname === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <div 
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  } ${isSidebarCollapsed ? "justify-center" : ""}`}
-                  title={isSidebarCollapsed ? item.label : ""}
-                >
-                  <item.icon size={20} className={`flex-shrink-0 ${isActive ? "text-primary drop-shadow-[0_0_5px_rgba(204,255,0,0.5)]" : "group-hover:text-white"}`} />
-                  
-                  {!isSidebarCollapsed && (
-                     <motion.span 
-                       initial={{ opacity: 0 }}
-                       animate={{ opacity: 1 }}
-                       className="font-medium whitespace-nowrap overflow-hidden"
-                     >
-                        {item.label}
-                     </motion.span>
-                  )}
-                  
-                  {isActive && !isSidebarCollapsed && (
-                    <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+                return (
+                  <Link key={item.label} href={item.href}>
+                    <div 
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${
+                        isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      } ${isSidebarCollapsed ? "justify-center" : ""}`}
+                      title={isSidebarCollapsed ? item.label : ""}
+                    >
+                      <item.icon size={20} className={`flex-shrink-0 ${isActive ? "text-primary drop-shadow-[0_0_5px_rgba(204,255,0,0.5)]" : "group-hover:text-white"}`} />
+                      
+                      {!isSidebarCollapsed && (
+                         <motion.span 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: 1 }}
+                           className="font-medium whitespace-nowrap overflow-hidden"
+                         >
+                            {item.label}
+                         </motion.span>
+                      )}
+                      
+                      {isActive && !isSidebarCollapsed && (
+                        <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
+                    </div>
+                  </Link>
+                );
+             })
+          ) : (
+             // --- DEVELOPER / CLIENT SIDEBAR ITEMS ---
+             sidebarItems.map((item) => {
+                // "New Lock" (PlusCircle) is only for DEVELOPER
+                if (item.label === "New Lock" && user?.role !== "DEVELOPER") return null;
+
+                const isActive = pathname === item.href;
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <div 
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${
+                        isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      } ${isSidebarCollapsed ? "justify-center" : ""}`}
+                      title={isSidebarCollapsed ? item.label : ""}
+                    >
+                      <item.icon size={20} className={`flex-shrink-0 ${isActive ? "text-primary drop-shadow-[0_0_5px_rgba(204,255,0,0.5)]" : "group-hover:text-white"}`} />
+                      
+                      {!isSidebarCollapsed && (
+                         <motion.span 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: 1 }}
+                           className="font-medium whitespace-nowrap overflow-hidden"
+                         >
+                            {item.label}
+                         </motion.span>
+                      )}
+                      
+                      {isActive && !isSidebarCollapsed && (
+                        <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
+                    </div>
+                  </Link>
+                );
+            })
+          )}
         </nav>
 
         <div className="p-4 border-t border-white/5 space-y-2">
           
-          {/* Profile Circle Link */}
-          <Link href="/dashboard/settings">
-            <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group hover:bg-white/5 ${isSidebarCollapsed ? "justify-center" : ""}`}>
-               <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-black overflow-hidden relative">
-                  {user?.avatarUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                      user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />
-                  )}
-               </div>
-               
-               {!isSidebarCollapsed && (
-                 <motion.div 
-                   initial={{ opacity: 0 }}
-                   animate={{ opacity: 1 }}
-                   className="flex flex-col overflow-hidden"
-                 >
-                    <span className="font-medium text-sm text-white truncate">{user?.name || "User"}</span>
-                    <span className="text-xs text-gray-500 truncate">{user?.role || "Member"}</span>
-                 </motion.div>
-               )}
-            </div>
-          </Link>
+          {/* Profile Circle Link - Only show if NOT Admin (Admin has Settings in list above) or keep consistent */}
+          {user?.role !== "ADMIN" && (
+              <Link href="/dashboard/settings">
+                <div className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group hover:bg-white/5 ${isSidebarCollapsed ? "justify-center" : ""}`}>
+                   <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg ring-2 ring-black overflow-hidden relative">
+                      {user?.avatarUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                          user?.name ? user.name.charAt(0).toUpperCase() : <User size={16} />
+                      )}
+                   </div>
+                   
+                   {!isSidebarCollapsed && (
+                     <motion.div 
+                       initial={{ opacity: 0 }}
+                       animate={{ opacity: 1 }}
+                       className="flex flex-col overflow-hidden"
+                     >
+                        <span className="font-medium text-sm text-white truncate">{user?.name || "User"}</span>
+                        <span className="text-xs text-gray-500 truncate">{user?.role || "Member"}</span>
+                     </motion.div>
+                   )}
+                </div>
+              </Link>
+          )}
 
           <button onClick={async () => {
               try {

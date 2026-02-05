@@ -128,8 +128,15 @@ export const initProject = async (req, res) => {
         }
     }
 
+
     // D. Notification for Client
     await createNotification(clientId, `Project Created: ${title}`, 'PROJECT', newProject.id, `/dashboard/projects/${newProject.id}`);
+
+    // LOGGING: PROJECT_CREATED
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [clientId, 'PROJECT_CREATED', JSON.stringify({ projectId: newProject.id, title, budget })]
+    );
 
     res.status(201).json({
       message: developerEmail 
@@ -225,6 +232,12 @@ export const inviteDeveloper = async (req, res) => {
     // Notify Client
     await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
 
+    // LOGGING: INVITE_SENT
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [clientId, 'INVITE_SENT', JSON.stringify({ projectId, developerEmail, projectTitle: project.title })]
+    );
+
     res.status(200).json({ 
         message: isNewUser ? 'Invite sent to join GitLock' : 'Invite sent successfully', 
         project: result.rows[0] 
@@ -265,7 +278,6 @@ export const removeDeveloper = async (req, res) => {
         // Notifications
         await createNotification(clientId, `Developer removed from "${project.title}". Project is now Open.`, 'PROJECT', project.id, `/dashboard/projects/${project.id}`);
         
-        // If developer was already assigned/invited, notify them
         if (oldDevEmail) {
             // Try to find if they are a registered user to send in-app notification
             const devUser = await findUserByEmail(oldDevEmail);
@@ -284,6 +296,12 @@ export const removeDeveloper = async (req, res) => {
                  );
             }
         }
+
+        // LOGGING: DEVELOPER_REMOVED
+        await pool.query(
+            `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+            [clientId, 'DEVELOPER_REMOVED', JSON.stringify({ projectId, removedEmail: oldDevEmail, projectTitle: project.title })]
+        );
 
         res.json({ message: 'Developer removed successfully', project: result.rows[0] });
 
@@ -321,6 +339,12 @@ export const acceptProject = async (req, res) => {
     // Notifications
     await createNotification(project.client_id, `Developer ${developerEmail} accepted your invite for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
     await createNotification(developerId, `You successfully joined project "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+
+    // LOGGING: INVITE_ACCEPTED
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [developerId, 'INVITE_ACCEPTED', JSON.stringify({ projectId, projectTitle: project.title })]
+    );
 
     res.status(200).json({ message: 'Project accepted!', project: result.rows[0] });
 
@@ -520,6 +544,12 @@ export const uploadCode = async (req, res) => {
     await createNotification(project.client_id, notificationMsg, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
     await createNotification(project.developer_id, `Code uploaded successfully for "${project.title}". Validation passed.`, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
 
+    // LOGGING: LOCK_CREATED (Code Upload)
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [req.user.id, 'LOCK_CREATED', JSON.stringify({ projectId, commitSha, stagingUrl, projectTitle: project.title })]
+    );
+
     res.status(200).json({ message: 'Code Verified & Locked', integrityHash: finalHash });
 
   } catch (error) {
@@ -677,6 +707,16 @@ export const downloadCode = async (req, res) => {
             });
             res.send(decryptedBuffer);
         }
+
+        // LOGGING: CODE_DOWNLOADED
+        // We log after starting send, better to do it before but inside try/catch.
+        // Using "fire and forget" if response is already streaming, but here we can just await since we sent streams/buffers.
+        // Actually res.send sends it. So we must put it before res.send or use fire-and-forget.
+        // Let's do parallel execution or before.
+        pool.query(
+            `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+            [req.user.id, 'CODE_DOWNLOADED', JSON.stringify({ projectId: id, projectTitle: project.title })]
+        ).catch(err => console.error("Logging failed", err));
 
 
 

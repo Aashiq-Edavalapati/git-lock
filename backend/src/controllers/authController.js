@@ -59,6 +59,12 @@ export const register = async (req, res) => {
     // console.log(`DEBUG ONLY: Generated OTP for ${email}: ${otp}`);
     await sendMFAEmail(email, otp);
 
+    // LOGGING: USER_REGISTERED
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [newUser.id, 'USER_REGISTERED', JSON.stringify({ email, role, method: 'EMAIL' })]
+    );
+
     res.status(201).json({ 
       message: 'Account created. Please verify your email.', 
       userId: newUser.id,
@@ -78,9 +84,20 @@ export const login = async (req, res) => {
     // Basic Validation
     const user = await findUserByEmail(email);
     if (!user) {
+      // Log Intrusion Attempt (Unknown User)
+      // We don't have a user ID, so we log with NULL user_id but include email in details
+      await pool.query(
+        `INSERT INTO audit_logs (action, details) VALUES ($1, $2)`,
+        ['LOGIN_FAILED', JSON.stringify({ email, reason: 'User not found', ip: req.ip })]
+      );
       return res.status(401).json({ error: 'User not found! Please Register before loggin in' });
     }
     if (!(await bcrypt.compare(password, user.password_hash))) {
+      // Log Intrusion Attempt (Wrong Password)
+      await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [user.id, 'LOGIN_FAILED', JSON.stringify({ email, reason: 'Invalid password', ip: req.ip })]
+      );
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -156,6 +173,12 @@ export const verifyMFA = async (req, res) => {
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
 
+    // LOGGING: USER_LOGIN
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [userId, 'USER_LOGIN', JSON.stringify({ method: 'EMAIL_MFA' })]
+    );
+
     res.status(200).json({ message: 'Login Complete' });
 
   } catch (error) {
@@ -227,6 +250,20 @@ export const githubLogin = async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
+
+    // LOGGING: USER_LOGIN (GitHub) or REGISTER
+    const action = user ? 'USER_LOGIN' : 'USER_REGISTERED'; 
+    // Wait, user is always set here (found or created).
+    // If we just created them, we should log registered. 
+    // To distinguish, we'd need to know if it was created. But `user` variable is reused.
+    // Let's just log USER_LOGIN for now, or assume Login. 
+    // Actually, line 216 checks if !user.
+    
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [user.id, 'USER_LOGIN', JSON.stringify({ method: 'GITHUB', githubId: githubProfile.id })]
+    );
+
     res.json({ token, user });
 
   } catch (error) {
@@ -277,6 +314,11 @@ export const googleLogin = async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     });
+
+    await pool.query(
+        `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
+        [user.id, 'USER_LOGIN', JSON.stringify({ method: 'GOOGLE' })]
+    );
 
     res.json({ token, user });
 

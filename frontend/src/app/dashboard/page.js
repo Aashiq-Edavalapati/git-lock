@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import ClientView from "@/components/dashboard/ClientView";
 import DeveloperView from "@/components/dashboard/DeveloperView";
 import AdminView from "@/components/dashboard/AdminView";
@@ -37,7 +37,11 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-in fade-in duration-500">
-       {role === "ADMIN" ? <AdminView /> : role === "DEVELOPER" ? <DeveloperView /> : <ClientView />}
+       {role === "ADMIN" ? (
+           <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>}>
+               <AdminView />
+           </Suspense>
+       ) : role === "DEVELOPER" ? <DeveloperView /> : <ClientView />}
     </div>
   );
 }
