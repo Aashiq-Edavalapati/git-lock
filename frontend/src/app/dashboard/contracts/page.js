@@ -33,6 +33,9 @@ export default function ContractsPage() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'COMPLETED': return 'bg-green-500';
+      case 'OWNERSHIP_VERIFIED': return 'bg-emerald-500';
+      case 'ESCROW_FUNDED': return 'bg-cyan-500';
+      case 'APPROVED': return 'bg-teal-500';
       case 'LOCKED_REVIEW': return 'bg-yellow-500';
       case 'IN_PROGRESS': return 'bg-blue-500';
       case 'INVITE_SENT': return 'bg-purple-500';
@@ -43,6 +46,9 @@ export default function ContractsPage() {
   const getStatusTextColor = (status) => {
     switch (status) {
       case 'COMPLETED': return 'text-green-500';
+      case 'OWNERSHIP_VERIFIED': return 'text-emerald-400';
+      case 'ESCROW_FUNDED': return 'text-cyan-400';
+      case 'APPROVED': return 'text-teal-400';
       case 'LOCKED_REVIEW': return 'text-yellow-500';
       case 'IN_PROGRESS': return 'text-blue-500';
       case 'INVITE_SENT': return 'text-purple-500';
@@ -54,7 +60,7 @@ export default function ContractsPage() {
     const matchesFilter = filter === 'all' 
       ? true 
       : filter === 'active' 
-        ? ['IN_PROGRESS', 'LOCKED_REVIEW', 'INVITE_SENT'].includes(c.status)
+        ? ['IN_PROGRESS', 'LOCKED_REVIEW', 'APPROVED', 'ESCROW_FUNDED', 'OWNERSHIP_VERIFIED', 'INVITE_SENT'].includes(c.status)
         : c.status === 'COMPLETED';
     
     const matchesSearch = c.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 

@@ -217,12 +217,11 @@ function ProjectCard({ project, onDelete }) {
       </div>
 
       <div className="mr-8">
-        {/* Added margin right to accommodate actions */}
-        {/* If status is LOCKED_REVIEW or COMPLETED, show button */}
-        {(project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') ? (
+        {/* If status is in escrow lifecycle, show View Vault button */}
+        {(['LOCKED_REVIEW', 'APPROVED', 'ESCROW_FUNDED', 'OWNERSHIP_VERIFIED', 'COMPLETED'].includes(project.status)) ? (
           <Link href={`/dashboard/escrow/${project.id}`}>
             <Button variant={project.status === 'COMPLETED' ? 'default' : 'outline'} className="h-10 flex items-center gap-2 border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all">
-              {project.status === 'COMPLETED' ? <Unlock size={16} className="text-green-400" /> : <Lock size={16} />} View Vault
+              {project.status === 'COMPLETED' ? <Unlock size={16} className="text-green-400" /> : <Lock size={16} className="text-primary" />} View Vault
             </Button>
           </Link>
         ) : (
