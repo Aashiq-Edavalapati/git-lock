@@ -64,8 +64,10 @@ export const setPrimaryPayoutMethod = async (id, userId) => {
     return methods.find(m => m.id === id);
 };
 
-// Check if user has a valid primary payout method
+// Check if user has a valid primary payout method (or blockchain wallet)
 export const hasValidPayoutMethod = async (userId) => {
+    const userRes = await pool.query('SELECT wallet_address FROM users WHERE id = $1', [userId]);
+    if (userRes.rows[0]?.wallet_address) return true;
     const methods = await getMethods(userId);
     return methods.some(m => m.is_primary);
 };

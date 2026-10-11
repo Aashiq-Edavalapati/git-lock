@@ -83,10 +83,10 @@ export default function DeveloperView() {
               </div>
 
               <div>
-                {(project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') ? (
+                {(['LOCKED_REVIEW', 'APPROVED', 'ESCROW_FUNDED', 'OWNERSHIP_VERIFIED', 'COMPLETED'].includes(project.status)) ? (
                   <Link href={`/dashboard/escrow/${project.id}`}>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      {project.status === 'COMPLETED' ? <Unlock size={16} /> : <Lock size={16} />} View Vault
+                    <Button variant="outline" className="flex items-center gap-2 border-white/10 bg-white/5 hover:bg-white/10">
+                      {project.status === 'COMPLETED' ? <Unlock size={16} className="text-green-400" /> : <Lock size={16} className="text-primary" />} View Vault
                     </Button>
                   </Link>
                 ) : project.status === 'INVITE_SENT' ? (

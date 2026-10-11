@@ -1,88 +1,130 @@
-# GitLock
+# GitLock: Trustless Code Escrow & Decentralized Delivery Platform
 
-*Verifiable, Trustless Code Escrow & Deployment Binding Platform.*
-
----
-
-### **1. The "Why?" (Problem Statement)**
-
-In the freelance software world, there is a fundamental "Deadlock of Trust":
-
-* **The Developer's Risk:** "If I deliver the source code first, the client might steal it and never pay."
-* **The Client's Risk:** "If I pay first, the developer might ghost me, or deliver broken code that doesn't match the demo."
-* **The "Demo" Scam:** A developer might show a working demo hosted on `vercel.app` but deliver an empty or broken zip file.
-
-**GitLock Solution:** An impartial, automated middleman. It cryptographically guarantees that the **Source Code** (in the Vault) matches the **GitHub Commit** (History) which matches the **Live Deployment** (The Demo). No trust required—just math.
+*Verifiable, Blockchain-Based Freelance Code Escrow & Deployment Binding Platform on BNB Smart Chain (BSC Testnet).*
 
 ---
 
-### **2. The Workflow (Solution)**
+### **1. Problem Statement**
 
-This workflow is designed to be **immutable**. Once a version is locked, it cannot be secretly changed.
-
-#### **Phase 1: The Binding (Developer Action)**
-
-1. **Upload:** Developer uploads `source_code.zip` to GitLock.
-2. **Encryption:** The system immediately **Encrypts** this file (AES-256) and stores it safely.
-3. **Hash Generation:** The system calculates the `UPLOAD_HASH` (SHA-256) of the file.
-4. **GitHub Link:** The Developer selects the specific **GitHub Commit** associated with this work via OAuth.
-5. **Verification I (Source Integrity):**
-* GitLock fetches the *official* source code archive for that commit directly from GitHub.
-* It computes `GITHUB_HASH`.
-* **Check:** `UPLOAD_HASH == GITHUB_HASH`. If they don't match, the upload is rejected. (Prevents uploading a fake zip file).
-
-
-
-#### **Phase 2: The Discovery (System Action)**
-
-6. **Verification II (Deployment Integrity):**
-* GitLock queries the GitHub API for **Deployments** linked to that specific commit SHA.
-* It automatically discovers the live URL (e.g., `https://project-demo.vercel.app`) from the CI/CD status.
-* *Result:* The Client knows for a fact that the website they are viewing was built from the exact code locked in the vault.
-
-
-
-#### **Phase 3: The Exchange (Client Action)**
-
-7. **Review:** Client logs in. They cannot download the code yet (Status: 🔒 **LOCKED**).
-8. **Proof:** Client sees the "Verified Deployment" link. They click it and test the live site.
-9. **Payment:** Client clicks **"Unlock & Pay"**.
-* A **Razorpay (Test Mode)** modal appears.
-* Client completes the mock transaction.
-
-
-10. **Release:**
-* GitLock backend verifies the **HMAC Digital Signature** of the payment webhook.
-* Status updates to **PAID**.
-* The "Download" button unlocks, decrypting the zip file on-the-fly.
-
-
+Freelance software transactions involve risks for both clients and developers, including unverified source code, unreliable delivery, and payment disputes. **GitLock** addresses these risks by verifying source-code integrity and deployment consistency, then using a blockchain-based escrow smart contract to hold payment until the client approves the delivery and ownership of the verified GitHub repository is transferred to them.
 
 ---
 
-### **3. Implementation Plan (Tech Stack)**
+### **2. The 7-Step Workflow**
 
-* **Frontend:** Next.js (App Router), Tailwind CSS.
-* **Backend:** Express.js (Node.js).
-* **Database:** PostgreSQL (via Supabase).
-* **Integrations:**
-  * **GitHub API (Octokit):** For fetching commits and deployment statuses.
-  * **Google OAuth**: For Continue with Google while logging/signing up
-  * **GitHub OAuth**: For Continue with GitHub while logging in/signing up
-  * **Razorpay (Test Mode):** For simulating the payment gateway.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant GL as GitLock Backend
+    actor Client as Client
+    participant SC as GitLockEscrow Smart Contract (BSC)
+
+    Dev->>GL: 1. Project Submission (ZIP, GitHub Repo, Commit Hash, Staging URL)
+    GL->>GL: 2. Verification (Source Code Hash == GitHub Archive, Deployment Active)
+    Client->>GL: 3. Client Approval (Tests Live Staging Demo & Approves)
+    Client->>SC: 4. Escrow Funding (Deposits BNB into Smart Contract)
+    Dev->>Client: 5. Repository Transfer (Transfers GitHub Repo Ownership to Client)
+    GL->>GL: 6. Ownership Verification (GitHub API Verifies Transfer & Signs Oracle Attestation)
+    Client->>SC: 7. Payment Release (Submits Attestation; Contract Releases BNB to Dev & Unlocks Code)
+```
+
+1. **Project Submission:** Developer submits the source ZIP, GitHub repository, commit hash, and deployment URL.
+2. **Verification:** GitLock verifies source-code integrity (ZIP CRC/SHA-256 vs GitHub commit archive) and deployment consistency (GitHub Deployments API).
+3. **Client Approval:** Client tests the live deployment URL and approves it.
+4. **Escrow Funding:** Client deposits BNB into the `GitLockEscrow` smart contract on BNB Smart Chain Testnet.
+5. **Repository Transfer:** Developer transfers GitHub repository ownership to the client.
+6. **Ownership Verification:** GitLock backend verifies the transfer via the GitHub API and cryptographically signs an EIP-191 oracle attestation.
+7. **Payment Release:** Smart contract verifies the oracle attestation signature and releases BNB to the developer, while the platform unlocks the decrypted source code for the client.
 
 ---
 
-### **4. Security Architecture**
+### **3. Blockchain & Smart Contract Architecture**
 
+The smart contract is written in **Solidity 0.8.20** and utilizes all fundamental and advanced Solidity concepts:
 
+- **Inheritance & Abstract Contracts:**
+  - `IGitLockEscrow`: Core interface defining data structures, enums, errors, events, and functions.
+  - `EscrowBase`: Abstract contract managing storage mappings, modifiers, and access control.
+  - `AttestationVerifier`: Abstract contract implementing cryptographic hashing, EIP-191 message prefixing, and `ecrecover` signature verification.
+  - `GitLockEscrow`: Main contract inheriting from `EscrowBase` and `AttestationVerifier`.
+- **Structs:**
+  - `Deal`: Stores deal ID, client, developer, amount, status, repository name, and timestamps.
+  - `OwnershipAttestation`: Encapsulates oracle attestation data (dealId, developer, client, repoFullName, nonce, deadline).
+- **Enums:**
+  - `DealState { None, Created, Funded, Approved, Completed, Refunded }`
+- **Custom Errors:**
+  - `DealNotFound`, `DealAlreadyExists`, `InvalidState`, `InvalidDepositAmount`, `Unauthorized`, `InvalidZeroAddress`, `InvalidOracleSignature`, `AttestationExpired`, `NonceAlreadyUsed`, `TransferFailed`, `ReentrancyGuardReentrantCall`.
+- **Modifiers:**
+  - `onlyOwner`, `onlyClient`, `onlyDeveloper`, `inState`, `validDeal`, `nonReentrant`.
+- **Events:**
+  - `DealCreated`, `EscrowFunded`, `DeploymentApproved`, `OwnershipAttested`, `PaymentReleased`, `EscrowRefunded`, `OracleUpdated`.
+- **Payable Functions:**
+  - `createAndFundDeal(bytes32, address, string)` (payable)
+  - `fundEscrow(bytes32)` (payable)
+  - `releasePaymentWithAttestation(...)` (transfers BNB via secure `.call`)
+  - `refund(bytes32)` (refunds BNB)
+  - `receive()`, `fallback()` (payable)
+- **View & Pure Functions:**
+  - `getDeal(bytes32)` (view)
+  - `isNonceUsed(bytes32)` (view)
+  - `getOracle()` (view)
+  - `hashAttestation(...)` (pure)
+  - `getEthSignedMessageHash(...)` (pure)
+  - `recoverSigner(...)` (pure)
+  - `splitSignature(...)` (pure assembly)
+  - `verifyAttestationSignature(...)` (pure)
+  - `projectIdToDealId(...)` (pure)
+- **Mappings:**
+  - `mapping(bytes32 => Deal) internal deals;`
+  - `mapping(bytes32 => bool) public usedNonces;` (replay attack protection)
+  - `mapping(address => uint256) public totalFundedByClient;`
+  - `mapping(address => uint256) public totalEarnedByDeveloper;`
 
-| **Component**             | **Feature in GitLock**               | **Technical Implementation**                                                                                                                                     |
-| ------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1. Authentication**     | **Secure Login**                     | JWT (JSON Web Tokens) stored in **HTTP-Only cookies**. Passwords hashed using `bcrypt`. Supports **Google** and **GitHub OAuth**.                                |
-| **1. MFA (Multi-Factor)** | **Payment MFA** (for critical steps) | Before the **Pay** modal opens, the user must enter an **Email OTP** to verify identity before a financial action.                                               |
-| **2. Authorization**      | **RBAC (Role-Based Access Control)** | **Access Matrix:**<br>• **Dev:** Write Code, Read Status<br>• **Client:** Read Preview, Write Approval<br>• **System:** Write Deployment Status (non-human role) |
-| **3. Encryption**         | **Data Privacy**                     | **AES-256** encryption. `source_code.zip` is stored as an encrypted buffer in PostgreSQL: `Buffer.from(encryptedData, 'hex')`.                                   |
-| **4. Hashing**            | **Data Integrity**                   | **SHA-256 comparison** between uploaded file hash and GitHub Commit Archive hash. Mismatch → **Reject upload**.                                                  |
-| **4. Digital Signature**  | **Authenticity**                     | **HMAC-SHA256** verification of `x-razorpay-signature` webhook header to confirm genuine payment success.                                                        |
-| **5. Encoding**           | **Visual Proof**                     | **Base64 encoding** of `README.md` to render a **Preview Card** on the dashboard without downloading the file.                                                   |
+---
+
+### **4. Deployed Smart Contract Details (BSC Testnet)**
+
+- **Network:** BNB Smart Chain Testnet (BSC Testnet)
+- **Chain ID:** `97` (`0x61`)
+- **Contract Address:** [`0x1642fb0220915E10b9e21cC18EFE10297154C67A`](https://testnet.bscscan.com/address/0x1642fb0220915E10b9e21cC18EFE10297154C67A)
+- **Oracle Signer Address:** `0x392e227Bf9201A328f9ebD8DBee33f3cBDB15b37`
+- **Minimal Test Amount:** `0.0001 tBNB` (designed to conserve testnet faucet funds)
+- **BscScan Explorer:** [https://testnet.bscscan.com](https://testnet.bscscan.com)
+
+---
+
+### **5. Testing & Verification**
+
+#### **Foundry Smart Contract Tests:**
+```bash
+cd contracts
+forge test -vvv
+```
+All 11 unit & integration tests pass with 100% success rate:
+- `test_InitialState`: Verifies oracle and owner initialization
+- `test_CreateAndFundDeal`: Verifies deposit and deal creation
+- `test_RevertWhen_ZeroDeposit`: Reverts on zero deposit
+- `test_RevertWhen_SelfDealing`: Reverts if client == developer
+- `test_ApproveDeployment`: Verifies client live deployment approval
+- `test_ReleasePaymentWithValidAttestation`: Verifies cryptographic oracle attestation and BNB transfer
+- `test_RevertWhen_InvalidOracleSignature`: Reverts on forged or unauthorized signature
+- `test_RevertWhen_AttestationExpired`: Reverts on expired deadline
+- `test_RevertWhen_NonceReused`: Reverts on replay attacks
+- `test_Refund`: Verifies client refund
+- `test_AdminUpdateOracle`: Verifies access control on oracle rotation
+
+#### **Live On-Chain E2E Verification:**
+```bash
+cd backend
+node scripts/verifyBlockchainEscrowE2E.js
+```
+Executes the full 7-step lifecycle live on BSC Testnet with minimal gas and verifies balance release.
+
+---
+
+### **6. Tech Stack**
+
+- **Smart Contracts:** Solidity `^0.8.20`, Foundry (`forge`, `cast`), BNB Smart Chain Testnet
+- **Backend:** Node.js, Express.js, Ethers.js v6, PostgreSQL, Octokit / GitHub REST API, AES-256 / RSA Hybrid Encryption
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Lucide React, Ethers.js v6 Web3 integration with MetaMask

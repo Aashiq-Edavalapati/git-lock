@@ -245,11 +245,14 @@ export default function SettingsPage() {
                             
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="font-bold text-white">{method.type === 'UPI' ? 'UPI ID' : 'Bank Account'}</p>
-                                    <p className="text-sm text-gray-300 mt-1">
-                                        {method.type === 'UPI' ? method.details.upiId : method.details.accountNumber}
+                                    <p className="font-bold text-white">
+                                        {method.type === 'CRYPTO_WALLET' ? 'tBNB Crypto Wallet' : method.type === 'UPI' ? 'UPI ID' : 'Bank Account'}
+                                    </p>
+                                    <p className="text-sm font-mono text-gray-300 mt-1 break-all">
+                                        {method.type === 'CRYPTO_WALLET' ? method.details.walletAddress : method.type === 'UPI' ? method.details.upiId : method.details.accountNumber}
                                     </p>
                                     {method.type === 'BANK_ACCOUNT' && <p className="text-xs text-gray-500">{method.details.holderName}</p>}
+                                    {method.type === 'CRYPTO_WALLET' && <p className="text-[10px] text-primary">{method.details.network || 'BSC Testnet'}</p>}
                                 </div>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); deletePayout(method.id); }}
