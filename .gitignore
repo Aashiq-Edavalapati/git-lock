@@ -5,3 +5,4 @@ postman
 .postman
 *.yaml
 .env.*
+!.env.example
