@@ -18,15 +18,19 @@ sequenceDiagram
     actor Dev as Developer
     participant GL as GitLock Backend
     actor Client as Client
-    participant SC as GitLockEscrow Smart Contract (BSC)
+    participant SC as GitLock Escrow
 
-    Dev->>GL: 1. Project Submission (ZIP, GitHub Repo, Commit Hash, Staging URL)
-    GL->>GL: 2. Verification (Source Code Hash == GitHub Archive, Deployment Active)
-    Client->>GL: 3. Client Approval (Tests Live Staging Demo & Approves)
-    Client->>SC: 4. Escrow Funding (Deposits BNB into Smart Contract)
-    Dev->>Client: 5. Repository Transfer (Transfers GitHub Repo Ownership to Client)
-    GL->>GL: 6. Ownership Verification (GitHub API Verifies Transfer & Signs Oracle Attestation)
-    Client->>SC: 7. Payment Release (Submits Attestation; Contract Releases BNB to Dev & Unlocks Code)
+    Dev->>GL: Submit project ZIP, repository, commit hash, staging URL
+    GL->>GL: Verify source hash and deployment
+    Client->>GL: Test staging demo and approve
+    Client->>SC: Deposit BNB into escrow
+    Dev->>Client: Transfer repository ownership
+    GL->>GL: Verify ownership using GitHub API
+    GL->>GL: Sign oracle attestation
+    Client->>SC: Submit attestation
+    SC->>SC: Verify attestation
+    SC->>Dev: Release BNB payment
+    SC->>Client: Unlock code access
 ```
 
 1. **Project Submission:** Developer submits the source ZIP, GitHub repository, commit hash, and deployment URL.
