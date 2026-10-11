@@ -489,8 +489,8 @@ export const forgotPassword = async (req, res) => {
     const { saveResetSecret } = await import('../models/userModel.js');
     await saveResetSecret(user.id, resetTokenHash, expiry);
 
-    // Send Email
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}&email=${email}`;
+    const frontendBaseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/$/, '');
+    const resetLink = `${frontendBaseUrl}/reset-password?token=${resetToken}&email=${email}`;
     // We need to import sendResetPasswordEmail from emailService (will add next)
     // For now using generic notification email or will update emailService
     const { sendNotificationEmail } = await import('../utils/emailService.js');

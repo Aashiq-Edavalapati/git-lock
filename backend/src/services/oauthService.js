@@ -3,6 +3,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const getFrontendUrl = () => {
+  return (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/$/, '');
+};
+
 // --- GITHUB OAUTH ---
 export const getGithubToken = async (code) => {
   const url = 'https://github.com/login/oauth/access_token';
@@ -10,7 +14,7 @@ export const getGithubToken = async (code) => {
     client_id: process.env.GITHUB_CLIENT_ID,
     client_secret: process.env.GITHUB_CLIENT_SECRET,
     code,
-    redirect_uri: `${process.env.FRONTEND_URL}/auth/github/callback`
+    redirect_uri: `${getFrontendUrl()}/auth/github/callback`
   }, {
     headers: { Accept: 'application/json' }
   });
@@ -43,7 +47,7 @@ export const getGoogleToken = async (code) => {
     client_secret: process.env.GOOGLE_CLIENT_SECRET,
     code,
     grant_type: 'authorization_code',
-    redirect_uri: `${process.env.FRONTEND_URL}/auth/google/callback`
+    redirect_uri: `${getFrontendUrl()}/auth/google/callback`
   });
   return data; // access_token, id_token
 };
