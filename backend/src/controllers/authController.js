@@ -202,6 +202,7 @@ export const getMe = async (req, res) => {
         role: user.role,
         bio: user.bio || '',
         avatarUrl: user.avatar_url || null,
+        walletAddress: user.wallet_address || null,
         isGithubConnected,
         hasPassword: user.password_hash && user.password_hash !== 'oauth_placeholder'
      });

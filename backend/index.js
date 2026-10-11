@@ -8,6 +8,7 @@ import paymentRoutes from './src/routes/paymentRoutes.js';
 import payoutRoutes from './src/routes/payoutRoutes.js';
 import githubRoutes from './src/routes/githubRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
+import escrowRoutes from './src/routes/escrowRoutes.js';
 import cookieParser from 'cookie-parser';
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/escrow', escrowRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/github', githubRoutes);

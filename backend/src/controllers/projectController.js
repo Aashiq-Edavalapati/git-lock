@@ -54,8 +54,9 @@ export const getProject = async (req, res) => {
         }
     }
     
-    // Include version details if locked
-    if (project.status === 'LOCKED_REVIEW' || project.status === 'COMPLETED') {
+    // Include version details if locked or in escrow flow
+    const lockedStates = ['LOCKED_REVIEW', 'APPROVED', 'ESCROW_FUNDED', 'OWNERSHIP_VERIFIED', 'COMPLETED'];
+    if (lockedStates.includes(project.status)) {
         const versionQuery = `
           SELECT id, project_id, zip_hash, staging_url, commit_sha, repo_url, created_at, readme_preview 
           FROM project_versions 

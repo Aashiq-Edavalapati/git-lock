@@ -24,7 +24,7 @@ export const findUserByEmail = async (email) => {
 
 // Find user by ID (for MFA verification/Token generation)
 export const findUserById = async (id) => {
-  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url, password_hash, public_key FROM users WHERE id = $1`;
+  const query = `SELECT id, email, full_name, role, created_at, bio, github_id, github_access_token, avatar_url, password_hash, public_key, wallet_address FROM users WHERE id = $1`;
   const result = await pool.query(query, [id]);
   return result.rows[0];
 };
