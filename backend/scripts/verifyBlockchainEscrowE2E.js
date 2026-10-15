@@ -19,7 +19,7 @@ const abiPath = path.resolve(__dirname, '../src/config/GitLockEscrowABI.json');
 const escrowAbi = JSON.parse(fs.readFileSync(abiPath, 'utf8'));
 
 const rpcUrl = process.env.BSC_TESTNET_RPC || 'https://data-seed-prebsc-1-s1.binance.org:8545/';
-const contractAddress = process.env.ESCROW_CONTRACT_ADDRESS || '0x1642fb0220915E10b9e21cC18EFE10297154C67A';
+const contractAddress = process.env.ESCROW_CONTRACT_ADDRESS || '0x30CF8a5fa441D39e0604781C24ADeeCBcbfecD49';
 const oraclePrivateKey = process.env.ORACLE_PRIVATE_KEY || '0x0e0c2034a2356eca34bade83bef909f3a21bf8554eaa74b0f34f3ada0c98f101';
 
 const provider = new ethers.JsonRpcProvider(rpcUrl);
