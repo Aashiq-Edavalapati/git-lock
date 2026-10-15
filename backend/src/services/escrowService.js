@@ -27,17 +27,19 @@ if (oraclePrivateKey) {
   }
 }
 
-let escrowContract = null;
-if (contractAddress) {
-  escrowContract = new ethers.Contract(contractAddress, escrowAbi, provider);
-}
+export const getEscrowContract = () => {
+  const currentAddress = process.env.ESCROW_CONTRACT_ADDRESS || contractAddress;
+  if (!currentAddress) return null;
+  return new ethers.Contract(currentAddress, escrowAbi, provider);
+};
 
 /**
  * Get public blockchain configuration
  */
 export const getBlockchainConfig = () => {
+  const activeAddress = process.env.ESCROW_CONTRACT_ADDRESS || contractAddress;
   return {
-    contractAddress,
+    contractAddress: activeAddress,
     chainId,
     rpcUrl,
     oracleAddress: oracleWallet ? oracleWallet.address : process.env.ORACLE_ADDRESS,
@@ -56,9 +58,10 @@ export const generateDealId = (projectId) => {
  * Read deal data from the smart contract on BSC Testnet
  */
 export const getOnchainDeal = async (dealId) => {
-  if (!escrowContract) throw new Error('Escrow contract not configured');
+  const contract = getEscrowContract();
+  if (!contract) throw new Error('Escrow contract not configured');
   try {
-    const deal = await escrowContract.getDeal(dealId);
+    const deal = await contract.getDeal(dealId);
     return {
       dealId: deal.dealId,
       client: deal.client,
@@ -81,7 +84,8 @@ export const getOnchainDeal = async (dealId) => {
  * Verify on-chain funding transaction or deal state
  */
 export const verifyOnchainFunding = async (dealId, txHash = null) => {
-  if (!escrowContract) throw new Error('Escrow contract not configured');
+  const contract = getEscrowContract();
+  if (!contract) throw new Error('Escrow contract not configured');
 
   if (txHash) {
     try {

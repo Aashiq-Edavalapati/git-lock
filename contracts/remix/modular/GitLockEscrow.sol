@@ -1,0 +1,190 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "./interfaces/IGitLockEscrow.sol";
+import "./abstracts/EscrowBase.sol";
+import "./abstracts/AttestationVerifier.sol";
+
+/**
+ * @title GitLockEscrow
+ * @author Aashiq Edavalapati
+ * @notice Trustless blockchain escrow for freelance software transactions.
+ * @dev Fully utilizes Solidity concepts:
+ *      - Inheritance: Inherits from EscrowBase and AttestationVerifier
+ *      - Abstract contracts: EscrowBase and AttestationVerifier
+ *      - Structs: Deal, OwnershipAttestation
+ *      - Enums: DealState
+ *      - Custom errors: Revert with parameterized custom errors
+ *      - Modifiers: onlyOwner, onlyClient, onlyDeveloper, inState, validDeal, nonReentrant
+ *      - Events: DealCreated, EscrowFunded, DeploymentApproved, OwnershipAttested, PaymentReleased, EscrowRefunded, OracleUpdated
+ *      - Payable functions: createAndFundDeal, fundEscrow, releasePaymentWithAttestation, refund, receive, fallback
+ *      - View and Pure functions: getDeal, isNonceUsed, getOracle, hashAttestation, getEthSignedMessageHash, recoverSigner, verifyAttestationSignature, projectIdToDealId
+ *      - Mappings: deals, usedNonces, totalFundedByClient, totalEarnedByDeveloper
+ */
+contract GitLockEscrow is EscrowBase, AttestationVerifier {
+    // ==========================================
+    // CONSTRUCTOR
+    // ==========================================
+    /**
+     * @notice Initializes the GitLock Escrow contract with an initial oracle address.
+     * @param initialOracle Address of the GitLock backend oracle responsible for verifying GitHub repo transfers.
+     */
+    constructor(address initialOracle) EscrowBase(initialOracle) {}
+
+    // ==========================================
+    // PAYABLE & STATE-CHANGING FUNCTIONS
+    // ==========================================
+
+    /**
+     * @notice Creates a new deal and funds the escrow in a single atomic transaction.
+     * @param dealId Unique 32-byte identifier for the deal (e.g. hash of GitLock project UUID).
+     * @param developer Address of the developer who will receive payment upon verified transfer.
+     * @param repoFullName Full GitHub repository name (e.g. "developer/awesome-app").
+     */
+    function createAndFundDeal(
+        bytes32 dealId,
+        address payable developer,
+        string calldata repoFullName
+    ) external payable override nonReentrant {
+        if (dealId == bytes32(0)) revert InvalidZeroAddress();
+        if (developer == address(0)) revert InvalidZeroAddress();
+        if (developer == msg.sender) revert Unauthorized(msg.sender);
+        if (bytes(repoFullName).length == 0) revert InvalidEmptyString();
+        if (msg.value == 0) revert InvalidDepositAmount(0, 1);
+        if (deals[dealId].state != DealState.None) revert DealAlreadyExists(dealId);
+
+        deals[dealId] = Deal({
+            dealId: dealId,
+            client: payable(msg.sender),
+            developer: developer,
+            amount: msg.value,
+            state: DealState.Funded,
+            repoFullName: repoFullName,
+            createdAt: block.timestamp,
+            fundedAt: block.timestamp,
+            completedAt: 0
+        });
+
+        totalFundedByClient[msg.sender] += msg.value;
+
+        emit DealCreated(dealId, msg.sender, developer, msg.value, repoFullName);
+        emit EscrowFunded(dealId, msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Funds an already registered deal that is in Created state.
+     * @param dealId Deal identifier to fund.
+     */
+    function fundEscrow(
+        bytes32 dealId
+    ) external payable override nonReentrant validDeal(dealId) inState(dealId, DealState.Created) {
+        Deal storage deal = deals[dealId];
+        if (msg.sender != deal.client) revert Unauthorized(msg.sender);
+        if (msg.value == 0 || msg.value != deal.amount) revert InvalidDepositAmount(msg.value, deal.amount);
+
+        deal.state = DealState.Funded;
+        deal.fundedAt = block.timestamp;
+        totalFundedByClient[msg.sender] += msg.value;
+
+        emit EscrowFunded(dealId, msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Step 3 in GitLock Workflow: Client tests live deployment and approves it.
+     * @param dealId Deal identifier.
+     */
+    function approveDeployment(
+        bytes32 dealId
+    ) external override onlyClient(dealId) {
+        Deal storage deal = deals[dealId];
+        if (deal.state != DealState.Funded) {
+            revert InvalidState(deal.state, DealState.Funded);
+        }
+
+        deal.state = DealState.Approved;
+        emit DeploymentApproved(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Step 7 in GitLock Workflow: Releases BNB to developer upon valid Oracle Attestation of GitHub transfer.
+     * @param attestation Oracle attestation containing deal ID, developer, client, repo, nonce, and deadline.
+     * @param signature Cryptographic ECDSA signature generated by the GitLock backend oracle.
+     */
+    function releasePaymentWithAttestation(
+        OwnershipAttestation calldata attestation,
+        bytes calldata signature
+    ) external override nonReentrant {
+        // 1. Expiration check
+        if (block.timestamp > attestation.deadline) {
+            revert AttestationExpired(attestation.deadline, block.timestamp);
+        }
+
+        // 2. Replay protection check
+        if (usedNonces[attestation.nonce]) {
+            revert NonceAlreadyUsed(attestation.nonce);
+        }
+
+        // 3. Cryptographic signature verification
+        if (!verifyAttestationSignature(attestation, signature, oracle)) {
+            revert InvalidOracleSignature();
+        }
+
+        // 4. Validate deal state
+        Deal storage deal = deals[attestation.dealId];
+        if (deal.state != DealState.Funded && deal.state != DealState.Approved) {
+            revert InvalidState(deal.state, DealState.Approved);
+        }
+
+        // 5. Cross-check attestation parameters with on-chain deal record
+        if (deal.developer != attestation.developer) revert Unauthorized(attestation.developer);
+        if (deal.client != attestation.client) revert Unauthorized(attestation.client);
+
+        // 6. State updates before external transfer (Checks-Effects-Interactions pattern)
+        usedNonces[attestation.nonce] = true;
+        deal.state = DealState.Completed;
+        deal.completedAt = block.timestamp;
+        uint256 payoutAmount = deal.amount;
+        totalEarnedByDeveloper[deal.developer] += payoutAmount;
+
+        emit OwnershipAttested(attestation.dealId, attestation.nonce, oracle, deal.developer);
+        emit PaymentReleased(attestation.dealId, deal.developer, payoutAmount);
+
+        // 7. Secure external BNB transfer to developer
+        (bool success, ) = deal.developer.call{value: payoutAmount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Refunds the escrowed funds back to the client in case of cancellation or mutual refund.
+     * @param dealId Deal identifier.
+     */
+    function refund(
+        bytes32 dealId
+    ) external override nonReentrant validDeal(dealId) {
+        Deal storage deal = deals[dealId];
+        
+        // Allowed by owner/admin or client before completion
+        if (msg.sender != owner && msg.sender != deal.client) {
+            revert Unauthorized(msg.sender);
+        }
+
+        if (deal.state != DealState.Funded && deal.state != DealState.Approved) {
+            revert InvalidState(deal.state, DealState.Funded);
+        }
+
+        deal.state = DealState.Refunded;
+        uint256 refundAmount = deal.amount;
+
+        emit EscrowRefunded(dealId, deal.client, refundAmount);
+
+        (bool success, ) = deal.client.call{value: refundAmount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    // ==========================================
+    // RECEIVE & FALLBACK PAYABLE FUNCTIONS
+    // ==========================================
+    receive() external payable {}
+
+    fallback() external payable {}
+}
