@@ -39,6 +39,8 @@ export default function AcceptInvitePage({ params }) {
         }
     }, [previewFile, setIsSidebarCollapsed]);
 
+    const [isDeclining, setIsDeclining] = useState(false);
+
     const handleAccept = async () => {
         setIsAccepting(true);
         try {
@@ -47,8 +49,21 @@ export default function AcceptInvitePage({ params }) {
             router.push(`/dashboard/projects/${projectId}`); 
         } catch (error) {
             console.error(error);
-            setErrorModal({ isOpen: true, message: "Failed to accept invitation" });
+            setErrorModal({ isOpen: true, message: error.response?.data?.error || "Failed to accept invitation" });
             setIsAccepting(false);
+        }
+    };
+
+    const handleDecline = async () => {
+        if (!confirm("Are you sure you want to decline this project invitation?")) return;
+        setIsDeclining(true);
+        try {
+            await api.post('/projects/decline', { projectId });
+            router.push('/dashboard');
+        } catch (error) {
+            console.error(error);
+            setErrorModal({ isOpen: true, message: error.response?.data?.error || "Failed to decline invitation" });
+            setIsDeclining(false);
         }
     };
 
@@ -170,11 +185,12 @@ export default function AcceptInvitePage({ params }) {
                          </div>
                          <div className="flex items-center gap-4 w-full md:w-auto">
                             <Button
-                                onClick={() => router.push('/dashboard')}
+                                onClick={handleDecline}
+                                disabled={isDeclining || isAccepting}
                                 variant="outline"
-                                className="h-14 px-8 w-full md:w-auto text-base"
+                                className="h-14 px-8 w-full md:w-auto text-base text-red-400 border-red-500/20 hover:bg-red-500/10"
                             >
-                                Decline
+                                {isDeclining ? "Declining..." : "Decline"}
                             </Button>
                             <Button
                                 onClick={handleAccept}

@@ -17,7 +17,8 @@ export const createUser = async (email, fullName, passwordHash, role, avatarUrl,
 
 // Find user by email (for Login)
 export const findUserByEmail = async (email) => {
-  const query = `SELECT * FROM users WHERE email = $1`;
+  if (!email) return null;
+  const query = `SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`;
   const result = await pool.query(query, [email]);
   return result.rows[0]; // Returns undefined if not found
 };

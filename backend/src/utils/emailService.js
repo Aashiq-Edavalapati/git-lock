@@ -77,6 +77,12 @@ const getEmailTemplate = (header, bodyContent) => {
   `;
 };
 
+const getSender = () => {
+  if (process.env.EMAIL_FROM) return process.env.EMAIL_FROM;
+  if (process.env.EMAIL_USER) return `"GitLock" <${process.env.EMAIL_USER}>`;
+  return 'GitLock <noreply@gitlock.io>';
+};
+
 export const sendMFAEmail = async (email, code) => {
   console.log(`[MFA OTP CODE] for ${email} is: ${code}`);
 
@@ -94,7 +100,7 @@ export const sendMFAEmail = async (email, code) => {
   `;
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSender(),
     to: email,
     subject: 'GitLock Security Verification',
     html: getEmailTemplate('Security Verification', htmlContent),
@@ -108,11 +114,16 @@ export const sendMFAEmail = async (email, code) => {
   }
 };
 
-export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget, subject, body) => {
+export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget, subject, body, projectId = null) => {
   const frontendUrl = getFrontendUrl();
-  const defaultBody = `
+  const targetUrl = projectId ? `${frontendUrl}/dashboard/accept-invite/${projectId}` : `${frontendUrl}/dashboard`;
+  
+  const additionalBodyHtml = body ? `<p style="padding: 12px; background: #f8f9fa; border-left: 3px solid #007bff; border-radius: 4px;">${body.replace(/\n/g, '<br>')}</p>` : '';
+  
+  const content = `
     <p>Hello,</p>
-    <p><strong>${clientName}</strong> has invited you to work on a new project.</p>
+    <p><strong>${clientName}</strong> has invited you to collaborate on <strong>"${projectTitle}"</strong> on GitLock.</p>
+    ${additionalBodyHtml}
     <table class="info-table">
       <tr>
         <td>Project</td>
@@ -123,13 +134,11 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
         <td>${budget} tBNB</td>
       </tr>
     </table>
-    <p>Please log in to your GitLock dashboard to accept or reject this invitation.</p>
-    <div style="text-align: center;">
-      <a href="${frontendUrl}/dashboard" class="btn">View Invitation</a>
+    <p>Please log in to your GitLock dashboard to review technical requirements and accept or decline this invitation.</p>
+    <div style="text-align: center; margin-top: 25px;">
+      <a href="${targetUrl}" class="btn">View & Accept Invitation</a>
     </div>
   `;
-  
-  const content = body ? `<p>${body.replace(/\n/g, '<br>')}</p>` : defaultBody;
   
   const transporter = getTransporter();
   if (!transporter) {
@@ -138,9 +147,9 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSender(),
     to: devEmail,
-    subject: subject || `New Project Invite: ${projectTitle}`,
+    subject: subject || `New Project Invitation: ${projectTitle}`,
     html: getEmailTemplate('Project Invitation', content)
   };
 
@@ -152,8 +161,18 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
   }
 };
 
-export const sendNotificationEmail = async (email, subject, text) => {
-  const htmlBody = `<p>${text.replace(/\n/g, '<br>')}</p>`;
+export const sendNotificationEmail = async (email, subject, text, actionUrl = null, actionText = 'Open Dashboard') => {
+  const frontendUrl = getFrontendUrl();
+  let htmlBody = `<p style="white-space: pre-line; line-height: 1.6;">${text.replace(/\n/g, '<br>')}</p>`;
+  
+  if (actionUrl) {
+    const fullUrl = actionUrl.startsWith('http') ? actionUrl : `${frontendUrl}${actionUrl}`;
+    htmlBody += `
+      <div style="text-align: center; margin-top: 25px;">
+        <a href="${fullUrl}" class="btn">${actionText}</a>
+      </div>
+    `;
+  }
   
   const transporter = getTransporter();
   if (!transporter) {
@@ -162,10 +181,10 @@ export const sendNotificationEmail = async (email, subject, text) => {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSender(),
     to: email,
     subject: subject,
-    html: getEmailTemplate('Notification', htmlBody)
+    html: getEmailTemplate('Project Update', htmlBody)
   };
 
   try {
@@ -188,7 +207,7 @@ export const sendWelcomeEmail = async (email, fullName) => {
       <li>Ensure secure payments and code delivery via blockchain escrow</li>
     </ul>
     <p>If you have any questions, feel free to reply to this email.</p>
-    <div style="text-align: center;">
+    <div style="text-align: center; margin-top: 25px;">
       <a href="${frontendUrl}/dashboard" class="btn">Go to Dashboard</a>
     </div>
   `;
@@ -200,7 +219,7 @@ export const sendWelcomeEmail = async (email, fullName) => {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSender(),
     to: email,
     subject: 'Welcome to GitLock!',
     html: getEmailTemplate('Welcome to GitLock', htmlContent),
@@ -214,17 +233,18 @@ export const sendWelcomeEmail = async (email, fullName) => {
   }
 };
 
-export const sendJoinInviteEmail = async (email, clientName, projectTitle) => {
+export const sendJoinInviteEmail = async (email, clientName, projectTitle, projectId = null) => {
   const frontendUrl = getFrontendUrl();
+  const registerUrl = `${frontendUrl}/register?role=DEVELOPER&email=${encodeURIComponent(email)}${projectId ? `&projectId=${projectId}` : ''}`;
   const htmlContent = `
     <p>Hello,</p>
     <p><strong>${clientName}</strong> has invited you to work on their project <strong>"${projectTitle}"</strong> on GitLock.</p>
-    <p>GitLock is a secure platform for developers and clients to collaborate with blockchain escrow-based payments.</p>
+    <p>GitLock is a secure platform for developers and clients to collaborate with source-code verification and blockchain escrow payments.</p>
     <p>To view the project details and accept the invitation, please create a developer account using the link below:</p>
-    <div style="text-align: center;">
-      <a href="${frontendUrl}/register?role=DEVELOPER&email=${email}" class="btn">Join GitLock</a>
+    <div style="text-align: center; margin-top: 25px;">
+      <a href="${registerUrl}" class="btn">Join GitLock as Developer</a>
     </div>
-    <p>If you already have an account, please log in.</p>
+    <p style="margin-top: 20px; font-size: 14px; color: #777;">If you already have an account, you can sign in directly.</p>
   `;
 
   const transporter = getTransporter();
@@ -234,7 +254,7 @@ export const sendJoinInviteEmail = async (email, clientName, projectTitle) => {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    from: getSender(),
     to: email,
     subject: `Invitation to join GitLock for "${projectTitle}"`,
     html: getEmailTemplate('Project Invitation', htmlContent),

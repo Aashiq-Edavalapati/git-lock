@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { acceptProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests, removeDeveloper, editProject, deleteProject, updateSafeDetails, requestBudgetUpdate, approveBudgetUpdate, rejectBudgetUpdate, sendBudgetApprovalOTP, revokeProjectAcceptance } from '../controllers/projectController.js';
+import { acceptProject, declineProject, initProject, inviteDeveloper, uploadCode, listProjects, getProject, verifyProjectDetails, downloadCode, requestLockModification, approveLockModification, getProjectLockRequests, removeDeveloper, editProject, deleteProject, updateSafeDetails, requestBudgetUpdate, approveBudgetUpdate, rejectBudgetUpdate, sendBudgetApprovalOTP, revokeProjectAcceptance } from '../controllers/projectController.js';
 import { getPaymentLogs } from '../controllers/auditController.js';
 import { authenticateToken, requireRole, checkAcl } from '../middleware/authMiddleware.js';
 
@@ -42,6 +42,7 @@ router.post('/cancel-invite', authenticateToken, requireRole('CLIENT'), removeDe
 // Developer accepts invite
 // ACL: PROJECT DETAILS - ACCEPT (Only Developer)
 router.post('/accept', authenticateToken, checkAcl('PROJECT_DETAILS', 'ACCEPT'), acceptProject);
+router.post('/decline', authenticateToken, checkAcl('PROJECT_DETAILS', 'ACCEPT'), declineProject);
 router.post('/:id/revoke', authenticateToken, requireRole('DEVELOPER'), revokeProjectAcceptance);
 
 // Developer uploads code

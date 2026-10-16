@@ -3,7 +3,7 @@ import AdmZip from 'adm-zip';
 import { createProject, findProjectById, saveProjectVersion, updateProjectStatus, createProject as createProjectModel, updateProject as updateProjectModel, deleteProject as deleteProjectModel } from '../models/projectModel.js';
 import { findUserByEmail, findUserById, getMFASecret, clearMFASecret } from '../models/userModel.js';
 import { encryptBuffer, generateFileHash } from '../utils/cryptoService.js';
-import { sendProjectInvite, sendNotificationEmail } from '../utils/emailService.js';
+import { sendProjectInvite, sendNotificationEmail, sendJoinInviteEmail } from '../utils/emailService.js';
 import { generateOTP, storeMFASecret } from '../utils/mfaService.js';
 import pool from '../config/db.js';
 import { createNotification } from '../models/notificationModel.js';
@@ -89,14 +89,18 @@ export const initProject = async (req, res) => {
   try {
     const { title, description, budget, developerEmail, requirements, attachments } = req.body;
     const clientId = req.user.id; // From JWT
-    const clientEmail = req.user.email;
+    const client = await findUserById(clientId);
+    const clientName = client?.full_name || client?.email || req.user.email || 'A GitLock Client';
+    const clientEmail = client?.email || req.user.email;
+
+    const normalizedDevEmail = developerEmail ? developerEmail.trim().toLowerCase() : null;
 
     // A. Validation: If dev email is provided
     let devUserId = null;
     let isNewUser = false;
 
-    if (developerEmail) {
-        const developer = await findUserByEmail(developerEmail);
+    if (normalizedDevEmail) {
+        const developer = await findUserByEmail(normalizedDevEmail);
         if (developer) {
             // Check Role
             if (developer.role !== 'DEVELOPER') {
@@ -109,38 +113,43 @@ export const initProject = async (req, res) => {
     }
 
     // B. Create Project
-    const status = developerEmail ? 'INVITE_SENT' : 'OPEN';
-    const newProject = await createProject(title, description, budget, clientId, developerEmail || null, requirements || "", attachments || [], status);
+    const status = normalizedDevEmail ? 'INVITE_SENT' : 'OPEN';
+    const newProject = await createProject(title, description, budget, clientId, normalizedDevEmail, requirements || "", attachments || [], status);
 
     // C. Handle Invite Logic
-    if (developerEmail) {
+    if (normalizedDevEmail) {
         if (!isNewUser) {
             // Existing Developer -> Standard Invite
-            await sendProjectInvite(developerEmail, clientEmail, title, budget);
-                // In-App Notification (Only for existing user)
+            await sendProjectInvite(normalizedDevEmail, clientName, title, budget, null, null, newProject.id);
+            // In-App Notification (Only for existing user)
             await createNotification(devUserId, `You received an invitation for project "${title}"`, 'PROJECT', newProject.id, `/dashboard/accept-invite/${newProject.id}`);
         } else {
             // Non-Existing User -> Join Invite
-            const { sendJoinInviteEmail } = await import('../utils/emailService.js');
-            // We need client name
-            const client = await findUserById(clientId);
-            await sendJoinInviteEmail(developerEmail, client.full_name, title);
+            await sendJoinInviteEmail(normalizedDevEmail, clientName, title, newProject.id);
             // No In-App Notification yet (will be created on registration)
         }
     }
 
-
-    // D. Notification for Client
+    // D. Notification & Confirmation for Client
     await createNotification(clientId, `Project Created: ${title}`, 'PROJECT', newProject.id, `/dashboard/projects/${newProject.id}`);
+    if (clientEmail) {
+        await sendNotificationEmail(
+            clientEmail,
+            `Project Created: ${title}`,
+            `Hello ${clientName},\n\nYour project "${title}" with an escrow budget of ${budget} tBNB has been successfully created.${normalizedDevEmail ? ` An invitation has been dispatched to ${normalizedDevEmail}.` : ''}\n\nYou can track project progress, review code delivery, and manage blockchain escrow directly from your dashboard.`,
+            `/dashboard/projects/${newProject.id}`,
+            'View Project Dashboard'
+        );
+    }
 
     // LOGGING: PROJECT_CREATED
     await pool.query(
         `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
-        [clientId, 'PROJECT_CREATED', JSON.stringify({ projectId: newProject.id, title, budget })]
+        [clientId, 'PROJECT_CREATED', JSON.stringify({ projectId: newProject.id, title, budget, developerEmail: normalizedDevEmail })]
     );
 
     res.status(201).json({
-      message: developerEmail 
+      message: normalizedDevEmail 
         ? (isNewUser ? 'Project created. Invite sent to join GitLock.' : 'Project created and invite sent to developer.') 
         : 'Project created (No developer invited yet)',
       project: newProject
@@ -157,10 +166,15 @@ export const inviteDeveloper = async (req, res) => {
   try {
     const { projectId, developerEmail, subject, body, requirements } = req.body;
     const clientId = req.user.id;
+    const client = await findUserById(clientId);
+    const clientName = client?.full_name || client?.email || req.user.email || 'A GitLock Client';
+    const clientEmail = client?.email || req.user.email;
 
     if (!developerEmail) {
         return res.status(400).json({ error: 'Developer email is required' });
     }
+
+    const normalizedDevEmail = developerEmail.trim().toLowerCase();
 
     // A. Authorization Check (Rubric #2: Access Control)
     const project = await findProjectById(projectId);
@@ -175,7 +189,7 @@ export const inviteDeveloper = async (req, res) => {
     let devUserId = null;
     let isNewUser = false;
 
-    const developer = await findUserByEmail(developerEmail);
+    const developer = await findUserByEmail(normalizedDevEmail);
     if (developer) {
         // Check Role
         if (developer.role !== 'DEVELOPER') {
@@ -189,8 +203,6 @@ export const inviteDeveloper = async (req, res) => {
     // B. Handle Attachments
     let attachments = [];
     if (req.files && req.files.length > 0) {
-        // In a real app, upload to S3 here.
-        // For now, we store metadata and simulate storage
         attachments = req.files.map(file => {
             const base64 = file.buffer.toString('base64');
             const dataUri = `data:${file.mimetype};base64,${base64}`;
@@ -199,44 +211,48 @@ export const inviteDeveloper = async (req, res) => {
                 name: file.originalname,
                 size: (file.size / 1024).toFixed(2) + ' KB',
                 type: file.mimetype,
-                url: dataUri, // Base64 Data URI
+                url: dataUri,
                 uploadedAt: new Date().toISOString()
             };
         });
     }
 
     // C. Update Database
-    // We update developer_email, status, requirements, and attachments
     const query = `
         UPDATE projects 
         SET developer_email = $1, status = 'INVITE_SENT', requirements = $3, attachments = $4
         WHERE id = $2 
         RETURNING *
     `;
-    const result = await pool.query(query, [developerEmail, projectId, requirements, JSON.stringify(attachments)]);
+    const result = await pool.query(query, [normalizedDevEmail, projectId, requirements, JSON.stringify(attachments)]);
 
     // D. Send Email
     if (!isNewUser) {
         // Standard User
-         await sendProjectInvite(developerEmail, req.user.email, project.title, project.budget, subject, body);
-         // Notification
-         await createNotification(devUserId, `You received an invitation for project "${project.title}"`, 'PROJECT', projectId, `/dashboard/accept-invite/${projectId}`);
+        await sendProjectInvite(normalizedDevEmail, clientName, project.title, project.budget, subject, body, projectId);
+        // Notification
+        await createNotification(devUserId, `You received an invitation for project "${project.title}"`, 'PROJECT', projectId, `/dashboard/accept-invite/${projectId}`);
     } else {
-         // Non-User
-         const { sendJoinInviteEmail } = await import('../utils/emailService.js');
-         // Need client name (req.user from middleware usually has id/email, fetch from DB to be safe or use what we updated in middleware if available)
-         // Assuming req.user only has jwt payload, safe to fetch
-         const client = await findUserById(clientId);
-         await sendJoinInviteEmail(developerEmail, client.full_name, project.title);
+        // Non-User
+        await sendJoinInviteEmail(normalizedDevEmail, clientName, project.title, projectId);
     }
  
-    // Notify Client
-    await createNotification(clientId, `Invite sent to ${developerEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+    // Notify Client (In-App & Email Confirmation)
+    await createNotification(clientId, `Invite sent to ${normalizedDevEmail} for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+    if (clientEmail) {
+        await sendNotificationEmail(
+            clientEmail,
+            `Invitation Dispatched: ${project.title}`,
+            `Hello ${clientName},\n\nYour project invitation for "${project.title}" has been sent to ${normalizedDevEmail}. You will be notified immediately when they accept or decline the invitation.`,
+            `/dashboard/projects/${projectId}`,
+            'View Project Dashboard'
+        );
+    }
 
     // LOGGING: INVITE_SENT
     await pool.query(
         `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
-        [clientId, 'INVITE_SENT', JSON.stringify({ projectId, developerEmail, projectTitle: project.title })]
+        [clientId, 'INVITE_SENT', JSON.stringify({ projectId, developerEmail: normalizedDevEmail, projectTitle: project.title })]
     );
 
     res.status(200).json({ 
@@ -317,14 +333,16 @@ export const acceptProject = async (req, res) => {
   try {
     const { projectId } = req.body;
     const developerId = req.user.id;
-    const developerEmail = req.user.email;
+    const devUser = await findUserById(developerId);
+    const developerEmail = devUser?.email || req.user.email;
+    const developerName = devUser?.full_name || developerEmail;
 
     // Check Project
     const project = await findProjectById(projectId);
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    // Access Control: Is this the invited email?
-    if (project.developer_email !== developerEmail) {
+    // Access Control: Is this the invited email? (case-insensitive check)
+    if (project.developer_email && developerEmail && project.developer_email.toLowerCase() !== developerEmail.toLowerCase()) {
       return res.status(403).json({ error: 'Unauthorized: You were not invited to this project' });
     }
 
@@ -337,9 +355,31 @@ export const acceptProject = async (req, res) => {
     `;
     const result = await pool.query(query, [developerId, projectId]);
 
-    // Notifications
-    await createNotification(project.client_id, `Developer ${developerEmail} accepted your invite for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+    // In-App Notifications
+    await createNotification(project.client_id, `Developer ${developerName} accepted your invite for "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
     await createNotification(developerId, `You successfully joined project "${project.title}"`, 'PROJECT', projectId, `/dashboard/projects/${projectId}`);
+
+    // Email Notifications to Client and Developer
+    const clientUser = await findUserById(project.client_id);
+    if (clientUser?.email) {
+      await sendNotificationEmail(
+        clientUser.email,
+        `Invitation Accepted: ${project.title}`,
+        `Hello ${clientUser.full_name || 'Client'},\n\nGreat news! Developer ${developerName} (${developerEmail}) has accepted your invitation for "${project.title}".\n\nThe project status is now IN_PROGRESS. The developer will now work on the project and lock the verified source code and deployment.\n\nYou can track the project and view escrow status anytime from your dashboard.`,
+        `/dashboard/projects/${projectId}`,
+        'Open Project Dashboard'
+      );
+    }
+
+    if (developerEmail) {
+      await sendNotificationEmail(
+        developerEmail,
+        `Project Started: ${project.title}`,
+        `Hello ${developerName},\n\nYou have accepted the invitation for "${project.title}" with an escrow budget of ${project.budget} tBNB.\n\nThe project is now IN_PROGRESS. When you are ready, lock and verify your GitHub repository and deployment on GitLock.`,
+        `/dashboard/projects/${projectId}`,
+        'Go to Project'
+      );
+    }
 
     // LOGGING: INVITE_ACCEPTED
     await pool.query(
@@ -352,6 +392,59 @@ export const acceptProject = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to accept project' });
+  }
+};
+
+// Dev declining the invite
+export const declineProject = async (req, res) => {
+  try {
+    const { projectId } = req.body;
+    const developerId = req.user.id;
+    const devUser = await findUserById(developerId);
+    const developerEmail = devUser?.email || req.user.email;
+    const developerName = devUser?.full_name || developerEmail;
+
+    const project = await findProjectById(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    if (project.developer_email && developerEmail && project.developer_email.toLowerCase() !== developerEmail.toLowerCase()) {
+      return res.status(403).json({ error: 'Unauthorized: You were not invited to this project' });
+    }
+
+    // Reset status to OPEN and clear developer_email
+    const query = `
+      UPDATE projects 
+      SET developer_email = NULL, developer_id = NULL, status = 'OPEN' 
+      WHERE id = $1 
+      RETURNING *
+    `;
+    const result = await pool.query(query, [projectId]);
+
+    // In-App Notification to Client
+    await createNotification(
+      project.client_id, 
+      `Developer ${developerName} declined your invitation for "${project.title}". Project is now OPEN.`, 
+      'PROJECT', 
+      projectId, 
+      `/dashboard/projects/${projectId}`
+    );
+
+    // Email to Client
+    const clientUser = await findUserById(project.client_id);
+    if (clientUser?.email) {
+      await sendNotificationEmail(
+        clientUser.email,
+        `Invitation Declined: ${project.title}`,
+        `Hello ${clientUser.full_name || 'Client'},\n\nDeveloper ${developerName} (${developerEmail}) has declined the invitation for "${project.title}".\n\nThe project status has been reset to OPEN. You can now invite another developer from your dashboard.`,
+        `/dashboard/projects/${projectId}`,
+        'Invite Another Developer'
+      );
+    }
+
+    res.status(200).json({ message: 'Invitation declined', project: result.rows[0] });
+  } catch (error) {
+    console.error('Decline project error:', error);
+    res.status(500).json({ error: 'Failed to decline project' });
   }
 };
 
@@ -544,6 +637,17 @@ export const uploadCode = async (req, res) => {
 
     await createNotification(project.client_id, notificationMsg, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
     await createNotification(project.developer_id, `Code uploaded successfully for "${project.title}". Validation passed.`, 'PROJECT', projectId, `/dashboard/escrow/${projectId}`);
+
+    // Email notification to client to test deployment & fund escrow
+    if (clientUser?.email) {
+      await sendNotificationEmail(
+        clientUser.email,
+        `Code Delivery Ready for Review: ${project.title}`,
+        `Hello ${clientUser.full_name || 'Client'},\n\nThe developer has submitted and locked the verified source code for "${project.title}".\n\n- Staging URL: ${cleanStagingUrl}\n- GitHub Commit: ${commitSha}\n- Integrity Check: Passed (Matches GitHub Source)\n\nPlease test the live staging URL and approve the deployment on GitLock to proceed with funding the escrow.`,
+        `/dashboard/escrow/${projectId}`,
+        'Review Delivery & Escrow'
+      );
+    }
 
     // LOGGING: LOCK_CREATED (Code Upload)
     await pool.query(

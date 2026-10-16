@@ -10,6 +10,7 @@ import {
 import { findProjectById } from '../models/projectModel.js';
 import { findUserById } from '../models/userModel.js';
 import { createNotification } from '../models/notificationModel.js';
+import { sendNotificationEmail } from '../utils/emailService.js';
 
 /**
  * 1. Get Blockchain Config
@@ -110,6 +111,17 @@ export const approveDeployment = async (req, res) => {
         projectId,
         `/dashboard/escrow/${projectId}`
       );
+
+      const devUser = await findUserById(project.developer_id);
+      if (devUser?.email) {
+        await sendNotificationEmail(
+          devUser.email,
+          `Deployment Approved: ${project.title}`,
+          `Hello ${devUser.full_name || 'Developer'},\n\nGreat news! The client has tested and approved your live deployment for "${project.title}".\n\nThe client is now proceeding to deposit funds (${project.budget} tBNB) into the blockchain escrow smart contract on BSC Testnet.`,
+          `/dashboard/escrow/${projectId}`,
+          'View Escrow Status'
+        );
+      }
     }
 
     // Audit log
@@ -169,6 +181,18 @@ export const recordEscrowFunding = async (req, res) => {
         projectId,
         `/dashboard/escrow/${projectId}`
       );
+
+      const devUser = await findUserById(project.developer_id);
+      const clientUser = await findUserById(project.client_id);
+      if (devUser?.email) {
+        await sendNotificationEmail(
+          devUser.email,
+          `Escrow Funded (${amount} tBNB): ${project.title}`,
+          `Hello ${devUser.full_name || 'Developer'},\n\nGreat news! The client has successfully funded the blockchain escrow smart contract with ${amount} tBNB on Binance Smart Chain Testnet for "${project.title}".\n\nTransaction Hash: ${txHash}\n\nPlease transfer ownership of the GitHub repository to the client (${clientUser?.github_id || clientUser?.email || 'the client'}) now so GitLock Oracle can verify the transfer and authorize your payout.`,
+          `/dashboard/escrow/${projectId}`,
+          'Open Escrow Dashboard'
+        );
+      }
     }
 
     await createNotification(
@@ -306,6 +330,26 @@ export const verifyOwnershipAndAttest = async (req, res) => {
       `/dashboard/escrow/${projectId}`
     );
 
+    // Email Notifications
+    if (clientUser?.email) {
+      await sendNotificationEmail(
+        clientUser.email,
+        `Repository Transfer Verified: ${project.title}`,
+        `Hello ${clientUser.full_name || 'Client'},\n\nGitLock Oracle has verified the repository ownership transfer of "${repoFullName}" and signed the cryptographic attestation.\n\nPayment can now be released to the developer on the blockchain smart contract.`,
+        `/dashboard/escrow/${projectId}`,
+        'Release Escrow Payment'
+      );
+    }
+    if (devUser?.email) {
+      await sendNotificationEmail(
+        devUser.email,
+        `Repository Transfer Verified & Attested: ${project.title}`,
+        `Hello ${devUser.full_name || 'Developer'},\n\nGitLock Oracle has verified the repository ownership transfer of "${repoFullName}" to the client!\n\nThe Oracle attestation has been signed. Payment can now be claimed/released from the escrow smart contract to your wallet on BSC Testnet.`,
+        `/dashboard/escrow/${projectId}`,
+        'Claim Payment'
+      );
+    }
+
     await pool.query(
       `INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)`,
       [userId, 'OWNERSHIP_VERIFIED', JSON.stringify({ projectId, repoFullName, oracleAddress, signature })]
@@ -358,6 +402,30 @@ export const recordPaymentRelease = async (req, res) => {
         'PAYMENT',
         projectId,
         `/dashboard/escrow/${projectId}`
+      );
+    }
+
+    // Email Notifications on Release & Completion
+    const clientUser = await findUserById(project.client_id);
+    const devUser = project.developer_id ? await findUserById(project.developer_id) : null;
+
+    if (devUser?.email) {
+      await sendNotificationEmail(
+        devUser.email,
+        `Payment Released (${project.escrow_amount || project.budget} tBNB): ${project.title}`,
+        `Hello ${devUser.full_name || 'Developer'},\n\nCongratulations! Escrow payment of ${project.escrow_amount || project.budget} tBNB has been released to your wallet on BSC Testnet.\n\nRelease Transaction Hash: ${txHash}\n\nThank you for working with GitLock.`,
+        `/dashboard/escrow/${projectId}`,
+        'View Escrow Summary'
+      );
+    }
+
+    if (clientUser?.email) {
+      await sendNotificationEmail(
+        clientUser.email,
+        `Project Completed & Assets Unlocked: ${project.title}`,
+        `Hello ${clientUser.full_name || 'Client'},\n\nPayment has been released and project "${project.title}" is now officially COMPLETED.\n\nYou have verified ownership of the GitHub repository, and decrypted project source code is available for download on GitLock.\n\nRelease Transaction Hash: ${txHash}`,
+        `/dashboard/escrow/${projectId}`,
+        'Download Source Code'
       );
     }
 
