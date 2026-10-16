@@ -123,10 +123,25 @@ export const verifyGithubRepoOwnership = async (repoOwner, repoName, expectedCli
       headers.Authorization = `Bearer ${token}`;
     }
 
+    let targetLogin = expectedClientGithubLogin;
+    // If a numeric GitHub ID was passed, resolve it to the username login
+    if (targetLogin && /^\d+$/.test(targetLogin.toString().trim())) {
+      try {
+        const uRes = await axios.get(`https://api.github.com/user/${targetLogin.toString().trim()}`, {
+          headers: { 'User-Agent': 'GitLock', Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+        });
+        if (uRes.data?.login) {
+          targetLogin = uRes.data.login;
+        }
+      } catch (err) {
+        console.warn('Could not resolve numeric github ID to username:', err.message);
+      }
+    }
+
     // First try querying repo directly under expected client login
     let currentOwner = null;
     try {
-      const res = await axios.get(`https://api.github.com/repos/${expectedClientGithubLogin}/${repoName}`, { headers });
+      const res = await axios.get(`https://api.github.com/repos/${targetLogin}/${repoName}`, { headers });
       currentOwner = res.data?.owner?.login;
     } catch (err) {
       // If not under new owner yet, check current owner
@@ -138,16 +153,16 @@ export const verifyGithubRepoOwnership = async (repoOwner, repoName, expectedCli
       }
     }
 
-    console.log(`GitHub Ownership Check: Repo: ${repoName} | Current Owner: ${currentOwner} | Expected: ${expectedClientGithubLogin}`);
+    console.log(`GitHub Ownership Check: Repo: ${repoName} | Current Owner: ${currentOwner} | Expected: ${targetLogin}`);
 
-    if (currentOwner && currentOwner.toLowerCase() === expectedClientGithubLogin.toLowerCase()) {
+    if (currentOwner && currentOwner.toLowerCase() === targetLogin.toLowerCase()) {
       return { verified: true, currentOwner };
     }
 
     return {
       verified: false,
       currentOwner,
-      message: `Repo owner is currently "${currentOwner || 'unknown'}", expected "${expectedClientGithubLogin}".`
+      message: `Repo owner is currently "${currentOwner || 'unknown'}", expected "${targetLogin}".`
     };
   } catch (error) {
     console.error('GitHub transfer verification error:', error.message);

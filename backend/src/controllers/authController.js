@@ -241,7 +241,7 @@ export const githubLogin = async (req, res) => {
 
     // Update their Github Token in DB
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2, avatar_url=$3 WHERE id = $4', 
-      [accessToken, githubProfile.id, githubProfile.avatar_url, user.id]);
+      [accessToken, githubProfile.login || githubProfile.id, githubProfile.avatar_url, user.id]);
 
     // Issue JWT
     const token = generateToken(user);
@@ -462,7 +462,7 @@ export const connectGithubAccount = async (req, res) => {
 
     const githubProfile = await getGithubUser(accessToken);
     await pool.query('UPDATE users SET github_access_token = $1, github_id = $2 WHERE id = $3', 
-      [accessToken, githubProfile.id, req.user.id]);
+      [accessToken, githubProfile.login || githubProfile.id, req.user.id]);
 
     await createNotification(req.user.id, `GitHub Account ${githubProfile.login || 'Unknown'} connected successfully.`, 'ACCOUNT', req.user.id, '/dashboard/settings');
 
