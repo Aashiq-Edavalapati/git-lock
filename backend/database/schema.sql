@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.projects (
     client_id uuid REFERENCES public.users(id),
     developer_email character varying,
     developer_id uuid REFERENCES public.users(id),
-    status character varying DEFAULT 'INVITE_SENT',
+    status character varying DEFAULT 'INVITE_SENT' CHECK (status IN ('OPEN', 'INVITE_SENT', 'IN_PROGRESS', 'LOCKED_REVIEW', 'APPROVED', 'ESCROW_FUNDED', 'OWNERSHIP_VERIFIED', 'COMPLETED', 'CANCELLED', 'REJECTED')),
     created_at timestamp with time zone DEFAULT now(),
     pending_budget numeric,
     requirements text,
