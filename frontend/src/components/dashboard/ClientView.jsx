@@ -179,7 +179,7 @@ function ProjectCard({ project, onDelete }) {
           <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
             <h3 className="font-bold text-white hover:text-primary transition-colors">{project.title}</h3>
           </Link>
-          <p className="text-sm text-gray-400">₹{project.budget} • {project.status}</p>
+          <p className="text-sm text-gray-400">{project.budget} tBNB • {project.status}</p>
         </div>
       </div>
 

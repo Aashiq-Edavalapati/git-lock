@@ -140,7 +140,7 @@ export default function ContractsPage() {
                     <Calendar size={14} /> {new Date(contract.created_at).toLocaleDateString()}
                  </div>
                  <div className="font-bold text-white text-lg">
-                    ₹{contract.budget}
+                    {contract.budget} tBNB
                  </div>
               </div>
 

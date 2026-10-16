@@ -52,7 +52,7 @@ export default function AcceptInviteModal({ isOpen, onClose, project, isDev = tr
                         </div>
                         <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-2">
                             <h3 className="text-xs uppercase text-gray-500 font-bold tracking-wider">Budget</h3>
-                            <p className="text-green-400 font-bold text-3xl tracking-tight">₹{project.budget}</p>
+                            <p className="text-green-400 font-bold text-3xl tracking-tight">{project.budget} tBNB</p>
                         </div>
                     </div>
 

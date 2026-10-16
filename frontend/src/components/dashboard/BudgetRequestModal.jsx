@@ -47,9 +47,12 @@ export default function BudgetRequestModal({ isOpen, onClose, projectId, current
 
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-gray-500 uppercase font-bold">New Budget (₹)</label>
+                        <label className="text-xs text-gray-500 uppercase font-bold">New Budget (tBNB)</label>
                         <input
                             type="number"
+                            step="any"
+                            min="0"
+                            placeholder="e.g. 0.0001"
                             className="w-full bg-black border border-white/10 p-2 text-white rounded mt-1"
                             value={amount}
                             onChange={e => setAmount(e.target.value)}

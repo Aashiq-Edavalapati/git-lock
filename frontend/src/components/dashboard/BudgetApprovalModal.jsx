@@ -61,11 +61,11 @@ export default function BudgetApprovalModal({ isOpen, onClose, projectId, curren
                 <div className="bg-white/5 p-4 rounded-lg mb-6 space-y-2">
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Current Budget</span>
-                        <span className="text-gray-300">₹{currentBudget}</span>
+                        <span className="text-gray-300">{currentBudget} tBNB</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold">
                         <span className="text-white">New Budget</span>
-                        <span className="text-green-400">₹{pendingBudget}</span>
+                        <span className="text-green-400">{pendingBudget} tBNB</span>
                     </div>
                 </div>
 

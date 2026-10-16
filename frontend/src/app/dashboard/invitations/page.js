@@ -183,7 +183,7 @@ function InvitationCard({ project, type, role, onRemove, onReview }) {
                 </div>
                 <div>
                     <h3 className="font-bold text-white group-hover:text-primary transition-colors">{project.title}</h3>
-                    <p className="text-sm text-gray-400"> Budget: ₹{project.budget} • <span className={`text-xs uppercase tracking-wide font-medium ${type === 'RECEIVED' ? 'text-blue-400' : ''}`}>{project.status}</span></p>
+                    <p className="text-sm text-gray-400"> Budget: {project.budget} tBNB • <span className={`text-xs uppercase tracking-wide font-medium ${type === 'RECEIVED' ? 'text-blue-400' : ''}`}>{project.status}</span></p>
                 </div>
             </div>
 

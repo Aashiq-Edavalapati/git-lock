@@ -96,7 +96,7 @@ export default function AcceptInvitePage({ params }) {
                         </div>
                         <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-3 hover:bg-white/[0.07] transition-colors">
                             <h3 className="text-xs uppercase text-gray-500 font-bold tracking-wider">Budget Offer</h3>
-                            <p className="text-green-400 font-bold text-4xl tracking-tight">₹{project.budget}</p>
+                            <p className="text-green-400 font-bold text-4xl tracking-tight">{project.budget} tBNB</p>
                         </div>
                     </div>
 

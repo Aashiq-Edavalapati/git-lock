@@ -73,12 +73,14 @@ export default function CreateProjectModal({ isOpen, onClose, onCreate }) {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs uppercase text-gray-500 font-semibold mb-2">Budget (₹)</label>
+                            <label className="block text-xs uppercase text-gray-500 font-semibold mb-2">Budget (tBNB)</label>
                             <input
                                 name="budget"
                                 type="number"
+                                step="any"
+                                min="0"
                                 className="w-full bg-black border border-white/10 p-3 text-white rounded-lg focus:border-green-500 outline-none transition-colors"
-                                placeholder="e.g. 50000"
+                                placeholder="e.g. 0.0001"
                                 value={formData.budget}
                                 onChange={handleChange}
                             />

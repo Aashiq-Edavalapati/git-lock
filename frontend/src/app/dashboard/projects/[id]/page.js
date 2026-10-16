@@ -218,7 +218,7 @@ export default function ProjectDetailsPage({ params }) {
                         <div className="bg-yellow-500/20 p-2 rounded-full text-yellow-500"><DollarSign size={20}/></div>
                         <div>
                             <h3 className="text-yellow-500 font-bold">Budget Change Requested</h3>
-                            <p className="text-gray-400 text-sm">Client wants to change budget from <span className="text-white">₹{project.budget}</span> to <span className="text-green-400 font-bold">₹{project.pending_budget}</span>.</p>
+                            <p className="text-gray-400 text-sm">Client wants to change budget from <span className="text-white">{project.budget} tBNB</span> to <span className="text-green-400 font-bold">{project.pending_budget} tBNB</span>.</p>
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -235,7 +235,7 @@ export default function ProjectDetailsPage({ params }) {
                         <div className="bg-blue-500/20 p-2 rounded-full text-blue-500"><Loader2 className="animate-spin" size={20}/></div>
                         <div>
                             <h3 className="text-blue-500 font-bold">Budget Update Pending</h3>
-                            <p className="text-gray-400 text-sm">Waiting for developer approval to change budget to <span className="text-white font-bold">₹{project.pending_budget}</span>.</p>
+                            <p className="text-gray-400 text-sm">Waiting for developer approval to change budget to <span className="text-white font-bold">{project.pending_budget} tBNB</span>.</p>
                         </div>
                     </div>
                 </div>
@@ -278,7 +278,7 @@ export default function ProjectDetailsPage({ params }) {
                             )}
                         </div>
                         <div className="text-white font-medium truncate flex items-center gap-2">
-                            ₹{project.budget}
+                            {project.budget} tBNB
                             {/* Visual lock if status is locked */}
                             {isLocked && <Lock size={12} className="text-gray-500"/>}
                         </div>

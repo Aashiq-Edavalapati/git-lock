@@ -205,7 +205,7 @@ function CreateLockForm() {
                               setBudget(p.budget);
                           }} className="glass-card p-6 rounded-xl border border-white/5 hover:border-primary/50 transition-all text-left group">
                               <h3 className="font-bold text-white text-lg group-hover:text-primary transition-colors">{p.title}</h3>
-                              <p className="text-gray-400 text-sm">₹{p.budget} • {p.status}</p>
+                              <p className="text-gray-400 text-sm">{p.budget} tBNB • {p.status}</p>
                           </button>
                       ))}
                   </div>

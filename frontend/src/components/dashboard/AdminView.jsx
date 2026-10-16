@@ -159,7 +159,7 @@ export default function AdminView() {
                                     {/* Center Text */}
                                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
                                         <span className="text-3xl font-bold text-white">
-                                            ₹{(escrowData[0].value + escrowData[1].value).toLocaleString()}
+                                            {(escrowData[0].value + escrowData[1].value).toLocaleString()} tBNB
                                         </span>
                                         <span className="text-xs text-gray-500 uppercase tracking-widest">Total Volume</span>
                                     </div>

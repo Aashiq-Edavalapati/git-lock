@@ -1,20 +1,38 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  logger: true,
-  debug: true,
-});
+const getFrontendUrl = () => {
+  return (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim().replace(/\/$/, '');
+};
 
+const getTransporter = () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    return null;
+  }
+
+  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.EMAIL_PORT || '587', 10);
+  const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+    logger: process.env.NODE_ENV !== 'production',
+    debug: process.env.NODE_ENV !== 'production',
+  });
+};
 
 const getEmailTemplate = (header, bodyContent) => {
   return `
@@ -60,10 +78,11 @@ const getEmailTemplate = (header, bodyContent) => {
 };
 
 export const sendMFAEmail = async (email, code) => {
-  console.log(`🔐 [MFA OTP CODE] for ${email} is: ${code}`);
+  console.log(`[MFA OTP CODE] for ${email} is: ${code}`);
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`ℹ️ EMAIL_USER not configured. Displaying OTP in console.`);
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`EMAIL_USER or EMAIL_PASS not configured. OTP displayed in console.`);
     return;
   }
 
@@ -75,7 +94,7 @@ export const sendMFAEmail = async (email, code) => {
   `;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: email,
     subject: 'GitLock Security Verification',
     html: getEmailTemplate('Security Verification', htmlContent),
@@ -83,13 +102,14 @@ export const sendMFAEmail = async (email, code) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ MFA Email sent to ${email}`);
+    console.log(`MFA Email sent to ${email}`);
   } catch (error) {
-    console.warn('⚠️ SMTP Email failed, proceeding with console OTP:', error.message);
+    console.warn('SMTP Email failed, proceeding with console OTP:', error.message);
   }
 };
 
 export const sendProjectInvite = async (devEmail, clientName, projectTitle, budget, subject, body) => {
+  const frontendUrl = getFrontendUrl();
   const defaultBody = `
     <p>Hello,</p>
     <p><strong>${clientName}</strong> has invited you to work on a new project.</p>
@@ -100,20 +120,25 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
       </tr>
       <tr>
         <td>Budget</td>
-        <td>$${budget}</td>
+        <td>${budget} tBNB</td>
       </tr>
     </table>
     <p>Please log in to your GitLock dashboard to accept or reject this invitation.</p>
     <div style="text-align: center;">
-      <a href="http://localhost:3000/dashboard" class="btn">View Invitation</a>
+      <a href="${frontendUrl}/dashboard" class="btn">View Invitation</a>
     </div>
   `;
   
-  // Use custom body if provided and wrap it, or use default
   const content = body ? `<p>${body.replace(/\n/g, '<br>')}</p>` : defaultBody;
   
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`Project invite to ${devEmail} logged (SMTP not configured).`);
+    return;
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: devEmail,
     subject: subject || `New Project Invite: ${projectTitle}`,
     html: getEmailTemplate('Project Invitation', content)
@@ -121,18 +146,23 @@ export const sendProjectInvite = async (devEmail, clientName, projectTitle, budg
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Invite sent to ${devEmail}`);
+    console.log(`Invite sent to ${devEmail}`);
   } catch (error) {
-    console.error('❌ Invite Email failed:', error);
+    console.error('Invite Email failed:', error.message);
   }
 };
 
 export const sendNotificationEmail = async (email, subject, text) => {
-  // Convert text newlines to HTML breaks if it's plain text
   const htmlBody = `<p>${text.replace(/\n/g, '<br>')}</p>`;
   
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`Notification to ${email}: ${subject} (SMTP not configured).`);
+    return;
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: email,
     subject: subject,
     html: getEmailTemplate('Notification', htmlBody)
@@ -140,13 +170,14 @@ export const sendNotificationEmail = async (email, subject, text) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Notification Email sent to ${email}`);
+    console.log(`Notification Email sent to ${email}`);
   } catch (error) {
-    console.error('❌ Notification Email failed:', error);
+    console.error('Notification Email failed:', error.message);
   }
 };
 
 export const sendWelcomeEmail = async (email, fullName) => {
+  const frontendUrl = getFrontendUrl();
   const htmlContent = `
     <p>Hello <strong>${fullName}</strong>,</p>
     <p>Welcome to <strong>GitLock</strong>! We are thrilled to have you on board.</p>
@@ -154,16 +185,22 @@ export const sendWelcomeEmail = async (email, fullName) => {
     <ul>
       <li>Complete your profile</li>
       <li>Create or find projects</li>
-      <li>Ensure secure payments and code delivery</li>
+      <li>Ensure secure payments and code delivery via blockchain escrow</li>
     </ul>
     <p>If you have any questions, feel free to reply to this email.</p>
     <div style="text-align: center;">
-      <a href="http://localhost:3000/dashboard" class="btn">Go to Dashboard</a>
+      <a href="${frontendUrl}/dashboard" class="btn">Go to Dashboard</a>
     </div>
   `;
 
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`Welcome email to ${email} logged (SMTP not configured).`);
+    return;
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: email,
     subject: 'Welcome to GitLock!',
     html: getEmailTemplate('Welcome to GitLock', htmlContent),
@@ -171,26 +208,33 @@ export const sendWelcomeEmail = async (email, fullName) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Welcome Email sent to ${email}`);
+    console.log(`Welcome Email sent to ${email}`);
   } catch (error) {
-    console.error('❌ Welcome Email failed:', error);
+    console.error('Welcome Email failed:', error.message);
   }
 };
 
 export const sendJoinInviteEmail = async (email, clientName, projectTitle) => {
+  const frontendUrl = getFrontendUrl();
   const htmlContent = `
     <p>Hello,</p>
     <p><strong>${clientName}</strong> has invited you to work on their project <strong>"${projectTitle}"</strong> on GitLock.</p>
-    <p>GitLock is a secure platform for developers and clients to collaborate with escrow-based payments.</p>
+    <p>GitLock is a secure platform for developers and clients to collaborate with blockchain escrow-based payments.</p>
     <p>To view the project details and accept the invitation, please create a developer account using the link below:</p>
     <div style="text-align: center;">
-      <a href="http://localhost:3000/register?role=DEVELOPER&email=${email}" class="btn">Join GitLock</a>
+      <a href="${frontendUrl}/register?role=DEVELOPER&email=${email}" class="btn">Join GitLock</a>
     </div>
     <p>If you already have an account, please log in.</p>
   `;
 
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`Join invite to ${email} for "${projectTitle}" logged (SMTP not configured).`);
+    return;
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
     to: email,
     subject: `Invitation to join GitLock for "${projectTitle}"`,
     html: getEmailTemplate('Project Invitation', htmlContent),
@@ -198,8 +242,8 @@ export const sendJoinInviteEmail = async (email, clientName, projectTitle) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Join Invite Email sent to ${email}`);
+    console.log(`Join Invite Email sent to ${email}`);
   } catch (error) {
-    console.error('❌ Join Invite Email failed:', error);
+    console.error('Join Invite Email failed:', error.message);
   }
 };

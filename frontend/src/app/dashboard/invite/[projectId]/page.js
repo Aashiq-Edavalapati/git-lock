@@ -220,7 +220,7 @@ export default function InvitePage({ params }) {
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-500">Budget</span>
-                                <span className="text-green-400 font-bold">₹{project.budget}</span>
+                                <span className="text-green-400 font-bold">{project.budget} tBNB</span>
                             </div>
                             <hr className="border-white/10" />
                             <div className="flex justify-between text-sm">
