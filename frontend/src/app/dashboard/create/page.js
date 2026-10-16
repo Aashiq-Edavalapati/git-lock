@@ -370,7 +370,7 @@ function CreateLockForm() {
                  
                  <div>
                     <h2 className="text-2xl font-bold text-white mb-2">Ready to Lock?</h2>
-                    <p className="text-gray-400">The escrow payment of <span className="text-white font-bold">{budget}</span> (or 0.0001 tBNB minimal test amount) will be held in the smart contract and released upon verified repository transfer.</p>
+                    <p className="text-gray-400">The escrow payment of <span className="text-white font-bold">{budget} tBNB</span> (or 0.0001 tBNB minimal test amount) will be held in the smart contract and released upon verified repository transfer.</p>
                  </div>
 
                  <div className="bg-white/5 p-6 rounded-xl text-left space-y-3 border border-white/10">

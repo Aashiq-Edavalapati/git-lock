@@ -16,6 +16,9 @@ const isLocal = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes('
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isLocal ? false : { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Test the connection immediately on startup
@@ -24,9 +27,8 @@ pool.connect()
   .catch((err) => console.error('❌ Database Connection Error:', err));
 
 // Add error listener to prevent crash on idle client errors
-pool.on('error', (err, client) => {
-  console.error('❌ Unexpected error on idle client', err);
-  process.exit(-1);
+pool.on('error', (err) => {
+  console.warn('⚠️ Idle PostgreSQL client error (will reconnect automatically):', err?.message || err);
 });
 
 export default pool;

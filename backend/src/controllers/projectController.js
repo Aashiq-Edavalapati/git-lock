@@ -981,13 +981,15 @@ export const requestBudgetUpdate = async (req, res) => {
         await pool.query('UPDATE projects SET pending_budget = $1 WHERE id = $2', [newBudget, id]);
 
         // Notify Developer (Action Required)
-        await createNotification(project.developer_id, `URGENT: Client requests budget update to ₹${newBudget} for "${project.title}". Please approve/reject.`, 'PROJECT', id, `/dashboard/projects/${id}`);
+        await createNotification(project.developer_id, `URGENT: Client requests budget update to ${newBudget} tBNB for "${project.title}". Please approve/reject.`, 'PROJECT', id, `/dashboard/projects/${id}`);
             // Email
         const devUser = await findUserById(project.developer_id);
             await sendNotificationEmail(
             devUser.email, 
             `Budget Change Request: ${project.title}`,
-            `The client wants to change the budget to ₹${newBudget}.\n\nPlease go to the dashboard to Approve or Reject this change.`
+            `The client wants to change the budget to ${newBudget} tBNB.\n\nPlease go to the dashboard to Approve or Reject this change.`,
+            `/dashboard/projects/${id}`,
+            'Review Budget Request'
         );
 
         res.json({ message: 'Budget update requested. Waiting for developer approval.' });
@@ -1057,7 +1059,7 @@ export const approveBudgetUpdate = async (req, res) => {
         await pool.query('UPDATE projects SET budget = $1, pending_budget = NULL WHERE id = $2', [newBudget, id]);
 
         // Notify Client
-        await createNotification(project.client_id, `Budget Approved! New budget for "${project.title}" is ₹${newBudget}.`, 'PROJECT', id, `/dashboard/projects/${id}`);
+        await createNotification(project.client_id, `Budget Approved! New budget for "${project.title}" is ${newBudget} tBNB.`, 'PROJECT', id, `/dashboard/projects/${id}`);
         
         res.json({ message: 'Budget updated successfully' });
 
