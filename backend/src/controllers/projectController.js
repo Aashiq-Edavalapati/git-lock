@@ -515,6 +515,13 @@ export const uploadCode = async (req, res) => {
   try {
     let { projectId, stagingUrl, commitSha, repoUrl, repoOwner, repoName } = req.body;
 
+    if (stagingUrl) {
+      stagingUrl = stagingUrl.trim();
+      if (!stagingUrl.startsWith('http://') && !stagingUrl.startsWith('https://')) {
+        stagingUrl = `https://${stagingUrl}`;
+      }
+    }
+
     commitSha = commitSha;
     
     // If repoOwner/Name provided directly, construct repoUrl
@@ -665,14 +672,59 @@ export const uploadCode = async (req, res) => {
   }
 };
 
+const normalizeUrl = (url) => {
+  if (!url) return '';
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+};
+
+const isDeploymentUrlMatch = (provided, actual, repo) => {
+  const normProvided = normalizeUrl(provided);
+  const normActual = normalizeUrl(actual);
+
+  if (!normProvided || !normActual) return false;
+
+  // Direct equality or substring match
+  if (normProvided === normActual) return true;
+  if (normActual.includes(normProvided) || normProvided.includes(normActual)) return true;
+
+  // Vercel deployment matching:
+  // e.g. actual: "gitlock-demo-6lzkx2ucx-...vercel.app", provided: "gitlock-demo.vercel.app"
+  if (normProvided.endsWith('.vercel.app') && normActual.endsWith('.vercel.app')) {
+    const providedProject = normProvided.replace(/\.vercel\.app$/, '');
+    if (normActual.startsWith(providedProject + '-') || normActual.startsWith(providedProject + '.')) {
+      return true;
+    }
+  }
+
+  // Netlify matching:
+  if (normProvided.endsWith('.netlify.app') && normActual.endsWith('.netlify.app')) {
+    const providedProject = normProvided.replace(/\.netlify\.app$/, '');
+    if (normActual.includes(providedProject)) {
+      return true;
+    }
+  }
+
+  // Check if project prefix in URL matches repository name
+  const repoName = (repo || '').toLowerCase();
+  if (repoName) {
+    const providedProject = normProvided.split('.')[0];
+    if (providedProject === repoName && (normActual.startsWith(repoName + '-') || normActual.startsWith(repoName + '.'))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl) => {
   const headers = { 
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json" 
   };
-
-  // Normalize Provided URL: Remove trailing slash if present
-  const cleanProvidedUrl = providedUrl ? providedUrl.replace(/\/$/, "") : providedUrl;
 
   // Get Deployments for this specific commit
   const deployUrl = `https://api.github.com/repos/${owner}/${repo}/deployments?sha=${commitSha}`;
@@ -682,37 +734,45 @@ const verifyDeploymentStatus = async (owner, repo, commitSha, token, providedUrl
     throw new Error('No deployments found for this commit SHA.');
   }
 
-  // Get the statuses for the most recent deployment
-  const deploymentId = deployments[0].id;
-  const statusUrl = `https://api.github.com/repos/${owner}/${repo}/deployments/${deploymentId}/statuses`;
-  const { data: statuses } = await axios.get(statusUrl, { headers });
+  let matched = false;
+  let detectedUrl = null;
 
-  // Find the "success" state
-  const successStatus = statuses.find(s => s.state === 'success');
+  for (const deployment of deployments) {
+    const statusUrl = `https://api.github.com/repos/${owner}/${repo}/deployments/${deployment.id}/statuses`;
+    const { data: statuses } = await axios.get(statusUrl, { headers });
+    const successStatus = statuses.find(s => s.state === 'success');
+    if (successStatus) {
+      detectedUrl = successStatus.environment_url || successStatus.target_url;
+      console.log("[DEBUG]: Evaluated Deployed URL:", detectedUrl, "against provided:", providedUrl);
+      if (isDeploymentUrlMatch(providedUrl, detectedUrl, repo)) {
+        matched = true;
+        break;
+      }
+    }
+  }
 
-  if (!successStatus) {
+  if (!detectedUrl) {
     throw new Error('No successful deployment status found.');
   }
 
-  // Extract the actual live URL
-  const actualUrl = successStatus.environment_url;
-
-  console.log("[DEBUG]: Actual Deployed URL:", actualUrl);
-  console.log("[DEBUG]: Provided URL (Cleaned):", cleanProvidedUrl);
-
-  // Compare using the cleaned URL
-  if (actualUrl && !actualUrl.includes(cleanProvidedUrl)) {
-    // throw new Error(`Deployment URL mismatch. Expected starting with: ${cleanProvidedUrl}, Found: ${actualUrl}`);
-    throw new Error(`Deployment URL mismatch. Please enter the correct deployment URL.`);
+  if (!matched) {
+    throw new Error(`Deployment URL mismatch. Please enter the correct deployment URL (e.g. ${detectedUrl}).`);
   }
 
-  return actualUrl;
+  return detectedUrl;
 };
 
 export const verifyProjectDetails = async (req, res) => {
     try {
-        const { repoOwner, repoName, commitSha, stagingUrl } = req.body;
+        let { repoOwner, repoName, commitSha, stagingUrl } = req.body;
         
+        if (stagingUrl) {
+            stagingUrl = stagingUrl.trim();
+            if (!stagingUrl.startsWith('http://') && !stagingUrl.startsWith('https://')) {
+                stagingUrl = `https://${stagingUrl}`;
+            }
+        }
+
         // Basic Validation
         if (!/^[0-9a-f]{40}$/.test(commitSha)) {
              return res.status(400).json({ error: 'Invalid Commit SHA. Must be 40 hexadecimal characters.' });
