@@ -4,16 +4,6 @@ Verifiable, blockchain-anchored freelance software escrow and repository deliver
 
 ---
 
-## Authors & Project Metadata
-
-- **Institution:** Department of Computer Science and Engineering
-- **Project:** Blockchain Technology Case Study
-- **Authors:**
-  - **Edavalapati Aashiq** (Roll Number: `CB.SC.U4CSE23560`)
-  - **Pucha Tirupathi Reddy** (Roll Number: `CB.SC.U4CSE23568`)
-
----
-
 ## Live Deployment Links
 
 | Resource | Endpoint / Identifier |
@@ -51,7 +41,7 @@ GitLock is structured into four decoupled layers:
 3. **Persistence and Relational Metadata (Supabase PostgreSQL):** Stores project metadata, user profiles, audit logs, and encrypted payloads with arbitrary precision numeric storage (`NUMERIC`).
 4. **On-Chain Settlement Layer (`GitLockEscrow` on BSC Testnet):** Autonomous Solidity smart contract enforcing fund locking, oracle attestation signature verification, replay attack prevention, and automated native asset payouts.
 
-![GitLock Secure Code Escrow Architecture](./GitLock%20Secure%20Code%20Escrow%20Architecture.png)
+![GitLock Secure Code Escrow Architecture](./architecture_diagram.png)
 
 ---
 
@@ -80,7 +70,7 @@ GitLock is structured into four decoupled layers:
 
 The GitLock protocol enforces a deterministic sequence of seven verified steps:
 
-![GitLock Secure Escrow Sequence Diagram](./GitLock%20Secure%20Escrow%20Sequence%20Diagram.png)
+![GitLock Secure Escrow Sequence Diagram](./sequence_diagram.png)
 
 ### Protocol Steps:
 
