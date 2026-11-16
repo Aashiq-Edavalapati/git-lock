@@ -50,6 +50,16 @@ app.get('/', (req, res) => {
   res.send('GitLock Secure API is Running...');
 });
 
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error('Health check failed:', err.message);
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
+});
+
 // Notification Routes (Quick implementation for Lab)
 app.get('/api/notifications', async (req, res) => {
   try {
