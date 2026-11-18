@@ -9,7 +9,7 @@ Verifiable, blockchain-anchored freelance software escrow and repository deliver
 | Resource | Endpoint / Identifier |
 | :--- | :--- |
 | **Frontend Application (Vercel)** | [https://git-lock-delta.vercel.app/](https://git-lock-delta.vercel.app/) |
-| **Backend API Service (Google Cloud Run)** | [https://gitlock-backend-197473198672.asia-southeast1.run.app/api](https://gitlock-backend-197473198672.asia-southeast1.run.app/api) |
+| **Backend API Service (Google Cloud Run)** | [https://gitlock-backend-377658691313.asia-southeast1.run.app/api](https://gitlock-backend-377658691313.asia-southeast1.run.app/api) |
 | **Smart Contract Address (BSC Testnet)** | [`0x30CF8a5fa441D39e0604781C24ADeeCBcbfecD49`](https://testnet.bscscan.com/address/0x30CF8a5fa441D39e0604781C24ADeeCBcbfecD49) |
 | **Block Explorer (BscScan)** | [https://testnet.bscscan.com/](https://testnet.bscscan.com/) |
 | **Backend Oracle Signer Address** | `0x392e227Bf9201A328f9ebD8DBee33f3cBDB15b37` |
@@ -273,8 +273,8 @@ EMAIL_PORT=587
 
 ### Frontend Configuration (`frontend/.env.local`)
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://gitlock-backend-197473198672.asia-southeast1.run.app/api
-NEXT_PUBLIC_API_URL=https://gitlock-backend-197473198672.asia-southeast1.run.app/api
+NEXT_PUBLIC_API_BASE_URL=https://gitlock-backend-377658691313.asia-southeast1.run.app/api
+NEXT_PUBLIC_API_URL=https://gitlock-backend-377658691313.asia-southeast1.run.app/api
 NEXT_PUBLIC_FRONTEND_URL=https://git-lock-delta.vercel.app
 NEXT_PUBLIC_BSC_CHAIN_ID=97
 NEXT_PUBLIC_BSC_RPC=https://data-seed-prebsc-1-s1.binance.org:8545/
